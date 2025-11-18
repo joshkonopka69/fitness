@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "FitnessGuru",
+    "slug": "fitnessguru",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hubertdomagalaa.fitnessguru",
+      "buildNumber": "1.0.0"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.hubertdomagalaa.fitnessguru",
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "extra": {
+      "privacyPolicyUrl": "https://hubertdomagalaa.github.io/fitnessguru-legal.pages/privacy-policy.html",
+      "termsOfServiceUrl": "https://hubertdomagalaa.github.io/fitnessguru-legal.pages/terms-of-service.html",
+      "eas": {
+        "projectId": "fb7c475e-3847-49a3-8f30-8548bf445117"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "owner": "hubertdomagala"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "supabase": {
+    "auth": {
+      "signUp": {
+        "description": "Register a new coach",
+        "parameters": ["email", "password", "user_metadata"],
+        "example": "supabase.auth.signUp({ email, password, options: { data: { name } } })"
+      },
+      "signIn": {
+        "description": "Sign in a coach",
+        "parameters": ["email", "password"],
+        "example": "supabase.auth.signInWithPassword({ email, password })"
+      },
+      "signOut": {
+        "description": "Sign out current user",
+        "example": "supabase.auth.signOut()"
+      }
+    },
+    "database": {
+      "clients": {
+        "select": "supabase.from('clients').select('*').eq('coach_id', user.id)",
+        "insert": "supabase.from('clients').insert({ name, phone, coach_id: user.id })",
+        "update": "supabase.from('clients').update({ name, phone }).eq('id', clientId)",
+        "delete": "supabase.from('clients').delete().eq('id', clientId)"
+      },
+      "training_sessions": {
+        "select": "supabase.from('training_sessions').select('*').eq('coach_id', user.id)",
+        "insert": "supabase.from('training_sessions').insert({ title, session_date, start_time, coach_id: user.id })"
+      },
+      "attendance": {
+        "select": "supabase.from('attendance').select('*, clients(*), training_sessions(*)')",
+        "upsert": "supabase.from('attendance').upsert({ session_id, client_id, present })"
+      }
+    }
+  },
+  "react_native": {
+    "navigation": {
+      "stack": "createStackNavigator()",
+      "tabs": "createBottomTabNavigator()",
+      "drawer": "createDrawerNavigator()"
+    },
+    "async_storage": {
+      "setItem": "AsyncStorage.setItem('key', 'value')",
+      "getItem": "AsyncStorage.getItem('key')",
+      "removeItem": "AsyncStorage.removeItem('key')"
+    }
+  }
+}
+

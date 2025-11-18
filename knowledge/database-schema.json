@@ -1,0 +1,55 @@
+{
+  "tables": {
+    "coaches": {
+      "columns": {
+        "id": { "type": "UUID", "primaryKey": true },
+        "email": { "type": "TEXT", "unique": true, "notNull": true },
+        "name": { "type": "TEXT", "notNull": true },
+        "created_at": { "type": "TIMESTAMP", "default": "NOW()" }
+      },
+      "relationships": {
+        "clients": "one-to-many",
+        "training_sessions": "one-to-many"
+      }
+    },
+    "clients": {
+      "columns": {
+        "id": { "type": "UUID", "primaryKey": true },
+        "coach_id": { "type": "UUID", "foreignKey": "coaches.id" },
+        "name": { "type": "TEXT", "notNull": true },
+        "phone": { "type": "TEXT", "nullable": true },
+        "membership_due_date": { "type": "DATE", "nullable": true },
+        "monthly_fee": { "type": "INTEGER", "default": 200 },
+        "active": { "type": "BOOLEAN", "default": true }
+      }
+    },
+    "training_sessions": {
+      "columns": {
+        "id": { "type": "UUID", "primaryKey": true },
+        "coach_id": { "type": "UUID", "foreignKey": "coaches.id" },
+        "title": { "type": "TEXT", "notNull": true },
+        "session_date": { "type": "DATE", "notNull": true },
+        "start_time": { "type": "TIME", "notNull": true }
+      }
+    },
+    "attendance": {
+      "columns": {
+        "id": { "type": "UUID", "primaryKey": true },
+        "session_id": { "type": "UUID", "foreignKey": "training_sessions.id" },
+        "client_id": { "type": "UUID", "foreignKey": "clients.id" },
+        "present": { "type": "BOOLEAN", "default": true },
+        "marked_at": { "type": "TIMESTAMP", "default": "NOW()" }
+      },
+      "constraints": {
+        "unique": ["session_id", "client_id"]
+      }
+    }
+  },
+  "views": {
+    "overdue_payments": {
+      "description": "Shows clients with overdue payments",
+      "columns": ["id", "name", "phone", "membership_due_date", "monthly_fee", "coach_id", "days_overdue"]
+    }
+  }
+}
+

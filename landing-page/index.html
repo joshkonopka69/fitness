@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitnessGuru - Aplikacja dla Trenerów Fitness</title>
+    <meta name="description" content="Profesjonalna aplikacja dla trenerów fitness. Zarządzaj klientami, sesjami treningowymi i rozwijaj swój biznes.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0A0A0A;
+            color: #FFFFFF;
+            line-height: 1.6;
+        }
+        
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 0 20px; 
+        }
+        
+        /* Hero Section */
+        .hero { 
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%);
+        }
+        
+        .logo { 
+            width: 120px;
+            height: 120px;
+            border-radius: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(0, 255, 136, 0.3);
+        }
+        
+        h1 { 
+            font-size: 56px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #00FF88 0%, #00CC6A 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+        
+        .subtitle { 
+            font-size: 22px;
+            color: #B0B0B0;
+            margin-bottom: 40px;
+            max-width: 700px;
+            line-height: 1.8;
+        }
+        
+        .cta { 
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .btn { 
+            padding: 16px 40px;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
+        }
+        
+        .btn-primary { 
+            background: #00FF88;
+            color: #0A0A0A;
+        }
+        
+        .btn-secondary { 
+            background: transparent;
+            color: #00FF88;
+            border: 2px solid #00FF88;
+        }
+        
+        .trial-note {
+            color: #9CA3AF;
+            font-size: 14px;
+        }
+        
+        /* Features Section */
+        .features { 
+            padding: 100px 20px;
+            background: #111111;
+        }
+        
+        .section-title {
+            text-align: center;
+            font-size: 42px;
+            margin-bottom: 20px;
+            color: #FFFFFF;
+        }
+        
+        .section-subtitle {
+            text-align: center;
+            color: #9CA3AF;
+            font-size: 18px;
+            margin-bottom: 60px;
+        }
+        
+        .feature-grid { 
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .feature { 
+            padding: 40px 30px;
+            background: linear-gradient(135deg, #1A1A1A 0%, #252525 100%);
+            border-radius: 20px;
+            border: 1px solid #2A2A2A;
+            transition: all 0.3s ease;
+        }
+        
+        .feature:hover {
+            transform: translateY(-5px);
+            border-color: #00FF88;
+            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.2);
+        }
+        
+        .feature-icon { 
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .feature h3 {
+            font-size: 22px;
+            margin-bottom: 10px;
+            color: #FFFFFF;
+        }
+        
+        .feature p {
+            color: #B0B0B0;
+            line-height: 1.8;
+        }
+        
+        /* Pricing Section */
+        .pricing { 
+            padding: 100px 20px;
+            text-align: center;
+            background: #0A0A0A;
+        }
+        
+        .price-cards {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+        
+        .price-card { 
+            flex: 1;
+            min-width: 300px;
+            max-width: 400px;
+            padding: 50px 40px;
+            background: linear-gradient(135deg, #1A1A1A 0%, #252525 100%);
+            border-radius: 24px;
+            border: 2px solid #2A2A2A;
+            transition: all 0.3s ease;
+        }
+        
+        .price-card.featured {
+            border-color: #00FF88;
+            box-shadow: 0 20px 60px rgba(0, 255, 136, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .price-card:hover {
+            transform: scale(1.08);
+            border-color: #00FF88;
+        }
+        
+        .price-card h3 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #FFFFFF;
+        }
+        
+        .price { 
+            font-size: 56px;
+            color: #00FF88;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        
+        .price-period {
+            color: #9CA3AF;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        
+        .features-list {
+            text-align: left;
+            margin: 30px 0;
+            list-style: none;
+        }
+        
+        .features-list li {
+            padding: 12px 0;
+            color: #B0B0B0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .features-list li:before {
+            content: "✓";
+            color: #00FF88;
+            font-weight: bold;
+            font-size: 20px;
+        }
+        
+        /* Footer */
+        footer { 
+            padding: 60px 20px;
+            text-align: center;
+            border-top: 1px solid #2A2A2A;
+            background: #0A0A0A;
+        }
+        
+        footer p {
+            color: #9CA3AF;
+            margin-bottom: 15px;
+        }
+        
+        footer a {
+            color: #9CA3AF;
+            text-decoration: none;
+            margin: 0 15px;
+            transition: color 0.3s;
+        }
+        
+        footer a:hover {
+            color: #00FF88;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 36px; }
+            .subtitle { font-size: 18px; }
+            .cta { flex-direction: column; align-items: stretch; }
+            .btn { justify-content: center; }
+            .price-card { min-width: 100%; }
+            .section-title { font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <img src="../appicon.png" alt="FitnessGuru Logo" class="logo">
+        <h1>FitnessGuru</h1>
+        <p class="subtitle">
+            Profesjonalna aplikacja dla trenerów fitness i coachów.<br>
+            Zarządzaj klientami, sesjami treningowymi i rozwijaj swój biznes - wszystko w jednym miejscu.
+        </p>
+        <div class="cta">
+            <a href="#" class="btn btn-primary">
+                🍎 Pobierz z App Store
+            </a>
+            <a href="#" class="btn btn-secondary">
+                📱 Pobierz z Google Play
+            </a>
+        </div>
+        <p class="trial-note">
+            ✨ 30 dni za darmo • Brak karty kredytowej • Dostępne w języku polskim
+        </p>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Wszystko, czego potrzebujesz</h2>
+            <p class="section-subtitle">
+                Stworzone specjalnie dla trenerów fitness w Polsce
+            </p>
+            <div class="feature-grid">
+                <div class="feature">
+                    <div class="feature-icon">📅</div>
+                    <h3>Zarządzanie Sesjami</h3>
+                    <p>
+                        Planuj i organizuj wszystkie sesje treningowe z kolorowymi oznaczeniami i notatkami.
+                    </p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">👥</div>
+                    <h3>Śledzenie Klientów</h3>
+                    <p>
+                        Zarządzaj nieograniczoną liczbą klientów ze szczegółowymi profilami i historią.
+                    </p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <h3>Analityka</h3>
+                    <p>
+                        Uzyskaj wgląd w wyniki swojego biznesu i rozwój klientów.
+                    </p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">💳</div>
+                    <h3>Płatności</h3>
+                    <p>
+                        Śledź płatności i nigdy nie przegap zaległości dzięki automatycznym przypomnieniom.
+                    </p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Kolorowe Kategorie</h3>
+                    <p>
+                        Oznaczaj sesje kolorami dla lepszej organizacji i szybkiej identyfikacji.
+                    </p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Polski + English</h3>
+                    <p>
+                        Pełna obsługa języka polskiego i angielskiego w całej aplikacji.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing">
+        <h2 class="section-title">Prosty Cennik</h2>
+        <p class="section-subtitle">
+            Zacznij z 30-dniowym darmowym okresem próbnym. Brak karty kredytowej.
+        </p>
+        <div class="price-cards">
+            <div class="price-card">
+                <h3>⚡ Miesięczny</h3>
+                <div class="price">19 zł</div>
+                <p class="price-period">miesięcznie</p>
+                <ul class="features-list">
+                    <li>Nieograniczona liczba klientów</li>
+                    <li>Zaawansowana analityka</li>
+                    <li>Śledzenie płatności</li>
+                    <li>Kolorowe kategorie sesji</li>
+                    <li>Priorytetowe wsparcie</li>
+                    <li>Export danych</li>
+                </ul>
+                <a href="#" class="btn btn-primary">Rozpocznij za darmo</a>
+            </div>
+            
+            <div class="price-card featured">
+                <h3>🔥 Roczny (OSZCZĘDŹ 38 zł!)</h3>
+                <div class="price">190 zł</div>
+                <p class="price-period">rocznie (2 miesiące gratis)</p>
+                <ul class="features-list">
+                    <li>Nieograniczona liczba klientów</li>
+                    <li>Zaawansowana analityka</li>
+                    <li>Śledzenie płatności</li>
+                    <li>Kolorowe kategorie sesji</li>
+                    <li>Priorytetowe wsparcie</li>
+                    <li>Export danych</li>
+                    <li><strong>2 miesiące GRATIS!</strong></li>
+                </ul>
+                <a href="#" class="btn btn-primary">Zacznij teraz</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p><strong>FitnessGuru</strong> - Stworzone dla trenerów, przez trenerów</p>
+            <p>© 2024 FitnessGuru. Wszelkie prawa zastrzeżone.</p>
+            <p>
+                <a href="../docs/legal/privacy-policy.html">Polityka Prywatności</a>
+                <a href="../docs/legal/terms-of-service.html">Regulamin</a>
+                <a href="mailto:support@fitnessguru.com">Kontakt</a>
+            </p>
+        </div>
+    </footer>
+</body>
+</html>
