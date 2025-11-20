@@ -22,7 +22,6 @@ import {
   PaymentStatsByCategory 
 } from '../../types/paymentTracking';
 import { paymentTrackingService } from '../../services/paymentTrackingService';
-import { categoryService } from '../../services/categoryService';
 
 const { width } = Dimensions.get('window');
 
@@ -36,7 +35,10 @@ export default function StatsScreen() {
   // Payment Tracking State
   const [paymentChartData, setPaymentChartData] = useState<PaymentChartData[]>([]);
   const [paymentViewMode, setPaymentViewMode] = useState<PaymentChartViewMode>('categories');
-  const [selectedCategoryForPayment, setSelectedCategoryForPayment] = useState<string | null>(null);
+  const [selectedCategoryForPayment, setSelectedCategoryForPayment] = useState<{ id: string; label: string } | null>(null);
+  const [selectedSubcategoryForPayment, setSelectedSubcategoryForPayment] = useState<{ id: string; label: string } | null>(null);
+  const [paymentChartLevel, setPaymentChartLevel] = useState<'categories' | 'subcategories' | 'clients'>('categories');
+  const [paymentBreadcrumb, setPaymentBreadcrumb] = useState<string | null>(null);
   const [loadingPaymentData, setLoadingPaymentData] = useState(false);
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function StatsScreen() {
     if (user) {
       fetchPaymentData();
     }
-  }, [paymentViewMode, selectedCategoryForPayment, user]);
+  }, [paymentViewMode, selectedCategoryForPayment, selectedSubcategoryForPayment, user]);
 
   const fetchData = async () => {
     if (!user) return;
@@ -78,44 +80,104 @@ export default function StatsScreen() {
 
     setLoadingPaymentData(true);
     try {
-      if (selectedCategoryForPayment) {
-        // Pokazuj klientów z wybranej kategorii
-        const { data: unpaidInCategory, error } = 
-          await paymentTrackingService.getUnpaidClientsInCategory(
-            user.id, 
+      if (paymentViewMode === 'categories') {
+        if (selectedSubcategoryForPayment) {
+          setPaymentChartLevel('clients');
+          setPaymentBreadcrumb(
             selectedCategoryForPayment
+              ? `${selectedCategoryForPayment.label} → ${selectedSubcategoryForPayment.label}`
+              : selectedSubcategoryForPayment.label
           );
 
-        if (error) throw error;
+          const { data: unpaidInSubcategory, error } = 
+            await paymentTrackingService.getUnpaidClientsInCategory(
+              user.id, 
+              selectedSubcategoryForPayment.id
+            );
 
-        const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
-          id: client.client_id,
-          label: client.client_name,
-          value: 1, // każdy klient = 1
-          color: colors.primary,
-        }));
+          if (error) throw error;
 
-        setPaymentChartData(chartData);
-      } else if (paymentViewMode === 'categories') {
-        // Pokazuj kategorie z liczbą nieopłaconych
-        const { data: categoryStats, error } = 
-          await paymentTrackingService.getPaymentStatsByCategory(user.id);
-
-        if (error) throw error;
-
-        const chartData: PaymentChartData[] = (categoryStats || [])
-          .filter(cat => cat.unpaid_clients > 0)
-          .map(cat => ({
-            id: cat.category_id,
-            label: cat.category_name,
-            value: cat.unpaid_clients,
-            color: cat.color,
-            icon: cat.icon,
+          const chartData: PaymentChartData[] = (unpaidInSubcategory || []).map(client => ({
+            id: client.client_id,
+            label: client.client_name,
+            value: 1,
+            color: colors.primary,
+            type: 'client',
+            parentId: selectedSubcategoryForPayment.id,
           }));
 
-        setPaymentChartData(chartData);
+          setPaymentChartData(chartData);
+        } else if (selectedCategoryForPayment) {
+          setPaymentBreadcrumb(selectedCategoryForPayment.label);
+
+          const { data: subcategoryStats, error } = 
+            await paymentTrackingService.getPaymentStatsBySubcategory(user.id, selectedCategoryForPayment.id);
+
+          if (error) throw error;
+
+          const subcategoryChart: PaymentChartData[] = (subcategoryStats || [])
+            .filter(sub => sub.unpaid_clients > 0)
+            .map(sub => ({
+              id: sub.subcategory_id,
+              label: sub.subcategory_name,
+              value: sub.unpaid_clients,
+              color: sub.color,
+              icon: sub.icon,
+              type: 'subcategory',
+              parentId: selectedCategoryForPayment.id,
+            }));
+
+          if (subcategoryChart.length > 0) {
+            setPaymentChartLevel('subcategories');
+            setPaymentChartData(subcategoryChart);
+          } else {
+            setPaymentChartLevel('clients');
+
+            const { data: unpaidInCategory, error: unpaidError } = 
+              await paymentTrackingService.getUnpaidClientsInCategory(
+                user.id, 
+                selectedCategoryForPayment.id
+              );
+
+            if (unpaidError) throw unpaidError;
+
+            const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
+              id: client.client_id,
+              label: client.client_name,
+              value: 1,
+              color: colors.primary,
+              type: 'client',
+              parentId: selectedCategoryForPayment.id,
+            }));
+
+            setPaymentChartData(chartData);
+          }
+        } else {
+          setPaymentBreadcrumb(null);
+          setPaymentChartLevel('categories');
+
+          const { data: categoryStats, error } = 
+            await paymentTrackingService.getPaymentStatsByCategory(user.id);
+
+          if (error) throw error;
+
+          const chartData: PaymentChartData[] = (categoryStats || [])
+            .filter(cat => cat.unpaid_clients > 0)
+            .map(cat => ({
+              id: cat.category_id,
+              label: cat.category_name,
+              value: cat.unpaid_clients,
+              color: cat.color,
+              icon: cat.icon,
+              type: 'category',
+            }));
+
+          setPaymentChartData(chartData);
+        }
       } else {
-        // Pokazuj wszystkich nieopłaconych klientów (bez kategorii + wszystkie z kategorii)
+        setPaymentBreadcrumb(null);
+        setPaymentChartLevel('clients');
+
         const { data: unpaidClients, error } = 
           await paymentTrackingService.getUnpaidClientsCurrentMonth(user.id);
 
@@ -126,6 +188,7 @@ export default function StatsScreen() {
           label: client.client_name,
           value: 1,
           color: colors.primary,
+          type: 'client',
         }));
 
         setPaymentChartData(chartData);
@@ -139,22 +202,35 @@ export default function StatsScreen() {
   };
 
   const handlePaymentBarPress = (item: PaymentChartData) => {
-    if (paymentViewMode === 'categories') {
-      // Kliknięto kategorię → pokaż klientów z tej kategorii
-      setSelectedCategoryForPayment(item.id);
-    } else {
+    if (paymentViewMode !== 'categories') {
       // Kliknięto klienta → nie rób nic (można dodać szczegóły klienta)
       console.log('Clicked client:', item.label);
+      return;
+    }
+
+    if (!selectedCategoryForPayment && paymentChartLevel === 'categories') {
+      setSelectedCategoryForPayment({ id: item.id, label: item.label });
+      setSelectedSubcategoryForPayment(null);
+    } else if (selectedCategoryForPayment && paymentChartLevel === 'subcategories') {
+      setSelectedSubcategoryForPayment({ id: item.id, label: item.label });
     }
   };
 
   const handlePaymentViewModeChange = (mode: PaymentChartViewMode) => {
     setPaymentViewMode(mode);
-    setSelectedCategoryForPayment(null); // Reset wybranej kategorii
+    if (mode !== 'categories') {
+      setSelectedCategoryForPayment(null);
+      setSelectedSubcategoryForPayment(null);
+    }
+    setPaymentBreadcrumb(null);
   };
 
   const handlePaymentBackPress = () => {
-    setSelectedCategoryForPayment(null);
+    if (selectedSubcategoryForPayment) {
+      setSelectedSubcategoryForPayment(null);
+    } else if (selectedCategoryForPayment) {
+      setSelectedCategoryForPayment(null);
+    }
   };
 
   if (loading) {
@@ -243,8 +319,14 @@ export default function StatsScreen() {
               onViewModeChange={handlePaymentViewModeChange}
               onBarPress={handlePaymentBarPress}
               loading={loadingPaymentData}
-              selectedCategory={selectedCategoryForPayment}
+              selectedCategory={
+                selectedSubcategoryForPayment?.id ||
+                selectedCategoryForPayment?.id ||
+                null
+              }
               onBackPress={handlePaymentBackPress}
+              level={paymentChartLevel}
+              breadcrumbLabel={paymentBreadcrumb}
             />
           </CardContent>
         </Card>

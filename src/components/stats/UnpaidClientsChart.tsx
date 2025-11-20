@@ -31,6 +31,8 @@ interface Props {
   loading?: boolean;
   selectedCategory?: string | null;
   onBackPress?: () => void;
+  level?: 'categories' | 'subcategories' | 'clients';
+  breadcrumbLabel?: string | null;
 }
 
 export function UnpaidClientsChart({
@@ -41,6 +43,8 @@ export function UnpaidClientsChart({
   loading = false,
   selectedCategory = null,
   onBackPress,
+  level = 'categories',
+  breadcrumbLabel = null,
 }: Props) {
   const { year, month } = getCurrentMonthYear();
   const maxValue = Math.max(...data.map((d) => d.value), 1);
@@ -87,7 +91,7 @@ export function UnpaidClientsChart({
             {formatMonthYear(year, month)}
           </Text>
         </View>
-        
+
         {!selectedCategory && (
           <View style={styles.toggleContainer}>
             <TouchableOpacity
@@ -137,6 +141,12 @@ export function UnpaidClientsChart({
         )}
       </View>
 
+      {breadcrumbLabel && (
+        <Text style={styles.breadcrumbText}>
+          {breadcrumbLabel}
+        </Text>
+      )}
+
       {/* Chart */}
       <View style={styles.chartContainer}>
         {data.map((item, index) => (
@@ -151,9 +161,6 @@ export function UnpaidClientsChart({
             >
               {/* Label */}
               <View style={styles.labelContainer}>
-                {item.icon && (
-                  <Text style={styles.labelIcon}>{item.icon}</Text>
-                )}
                 <Text style={styles.labelText} numberOfLines={1}>
                   {item.label}
                 </Text>
@@ -180,7 +187,7 @@ export function UnpaidClientsChart({
               <Text style={styles.valueText}>{item.value}</Text>
 
               {/* Arrow for categories */}
-              {viewMode === 'categories' && (
+              {viewMode === 'categories' && level !== 'clients' && (
                 <Ionicons 
                   name="chevron-forward" 
                   size={20} 
@@ -193,7 +200,7 @@ export function UnpaidClientsChart({
       </View>
 
       {/* Hint */}
-      {viewMode === 'categories' && (
+      {viewMode === 'categories' && !selectedCategory && (
         <View style={styles.hintContainer}>
           <Ionicons name="information-circle" size={16} color={colors.textSecondary} />
           <Text style={styles.hintText}>
@@ -292,11 +299,7 @@ const styles = StyleSheet.create({
   labelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     width: 120,
-  },
-  labelIcon: {
-    fontSize: 16,
   },
   labelText: {
     flex: 1,
@@ -336,6 +339,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     fontFamily: 'Poppins-Regular',
+  },
+  breadcrumbText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontFamily: 'Poppins-Medium',
+    paddingLeft: 4,
   },
 });
 

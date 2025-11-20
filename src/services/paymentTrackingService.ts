@@ -9,6 +9,7 @@ import {
   UnpaidClient, 
   UnpaidClientInCategory,
   PaymentStatsByCategory,
+  PaymentStatsBySubcategory,
   PaymentStats,
   getCurrentMonthYear 
 } from '../types/paymentTracking';
@@ -57,6 +58,20 @@ export const paymentTrackingService = {
       .order('category_name');
     
     return { data: data as PaymentStatsByCategory[] | null, error };
+  },
+
+  /**
+   * Pobiera statystyki płatności dla podkategorii danej kategorii
+   */
+  async getPaymentStatsBySubcategory(coachId: string, parentCategoryId: string) {
+    const { data, error } = await supabase
+      .from('payment_stats_by_subcategory')
+      .select('*')
+      .eq('coach_id', coachId)
+      .eq('parent_category_id', parentCategoryId)
+      .order('subcategory_name');
+    
+    return { data: data as PaymentStatsBySubcategory[] | null, error };
   },
 
   /**

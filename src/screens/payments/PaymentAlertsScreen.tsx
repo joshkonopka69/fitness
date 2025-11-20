@@ -5,12 +5,14 @@ import React, { useCallback, useState } from 'react';
 import {
   Alert,
   Dimensions,
+  Keyboard,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -74,7 +76,10 @@ export default function PaymentAlertsScreen({ navigation }: any) {
   // Payment Tracking State
   const [paymentChartData, setPaymentChartData] = useState<PaymentChartData[]>([]);
   const [paymentViewMode, setPaymentViewMode] = useState<PaymentChartViewMode>('categories');
-  const [selectedCategoryForPayment, setSelectedCategoryForPayment] = useState<string | null>(null);
+  const [selectedCategoryForPayment, setSelectedCategoryForPayment] = useState<{ id: string; label: string } | null>(null);
+  const [selectedSubcategoryForPayment, setSelectedSubcategoryForPayment] = useState<{ id: string; label: string } | null>(null);
+  const [paymentChartLevel, setPaymentChartLevel] = useState<'categories' | 'subcategories' | 'clients'>('categories');
+  const [paymentBreadcrumb, setPaymentBreadcrumb] = useState<string | null>(null);
   const [loadingPaymentData, setLoadingPaymentData] = useState(false);
 
   useFocusEffect(
@@ -92,7 +97,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
       if (user) {
         fetchPaymentData();
       }
-    }, [paymentViewMode, selectedCategoryForPayment])
+    }, [paymentViewMode, selectedCategoryForPayment, selectedSubcategoryForPayment])
   );
 
   const fetchAllClients = async () => {
@@ -175,44 +180,104 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
     setLoadingPaymentData(true);
     try {
-      if (selectedCategoryForPayment) {
-        // Pokazuj klientów z wybranej kategorii
-        const { data: unpaidInCategory, error } = 
-          await paymentTrackingService.getUnpaidClientsInCategory(
-            user.id, 
+      if (paymentViewMode === 'categories') {
+        if (selectedSubcategoryForPayment) {
+          setPaymentChartLevel('clients');
+          setPaymentBreadcrumb(
             selectedCategoryForPayment
+              ? `${selectedCategoryForPayment.label} → ${selectedSubcategoryForPayment.label}`
+              : selectedSubcategoryForPayment.label
           );
 
-        if (error) throw error;
+          const { data: unpaidInSubcategory, error } = 
+            await paymentTrackingService.getUnpaidClientsInCategory(
+              user.id, 
+              selectedSubcategoryForPayment.id
+            );
 
-        const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
-          id: client.client_id,
-          label: client.client_name,
-          value: 1, // każdy klient = 1
-          color: colors.primary,
-        }));
+          if (error) throw error;
 
-        setPaymentChartData(chartData);
-      } else if (paymentViewMode === 'categories') {
-        // Pokazuj kategorie z liczbą nieopłaconych
-        const { data: categoryStats, error } = 
-          await paymentTrackingService.getPaymentStatsByCategory(user.id);
-
-        if (error) throw error;
-
-        const chartData: PaymentChartData[] = (categoryStats || [])
-          .filter(cat => cat.unpaid_clients > 0)
-          .map(cat => ({
-            id: cat.category_id,
-            label: cat.category_name,
-            value: cat.unpaid_clients,
-            color: cat.color,
-            icon: cat.icon,
+          const chartData: PaymentChartData[] = (unpaidInSubcategory || []).map(client => ({
+            id: client.client_id,
+            label: client.client_name,
+            value: 1,
+            color: colors.primary,
+            type: 'client',
+            parentId: selectedSubcategoryForPayment.id,
           }));
 
-        setPaymentChartData(chartData);
+          setPaymentChartData(chartData);
+        } else if (selectedCategoryForPayment) {
+          setPaymentBreadcrumb(selectedCategoryForPayment.label);
+
+          const { data: subcategoryStats, error } = 
+            await paymentTrackingService.getPaymentStatsBySubcategory(user.id, selectedCategoryForPayment.id);
+
+          if (error) throw error;
+
+          const subcategoryChart: PaymentChartData[] = (subcategoryStats || [])
+            .filter(sub => sub.unpaid_clients > 0)
+            .map(sub => ({
+              id: sub.subcategory_id,
+              label: sub.subcategory_name,
+              value: sub.unpaid_clients,
+              color: sub.color,
+              icon: sub.icon,
+              type: 'subcategory',
+              parentId: selectedCategoryForPayment.id,
+            }));
+
+          if (subcategoryChart.length > 0) {
+            setPaymentChartLevel('subcategories');
+            setPaymentChartData(subcategoryChart);
+          } else {
+            setPaymentChartLevel('clients');
+
+            const { data: unpaidInCategory, error: unpaidError } = 
+              await paymentTrackingService.getUnpaidClientsInCategory(
+                user.id, 
+                selectedCategoryForPayment.id
+              );
+
+            if (unpaidError) throw unpaidError;
+
+            const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
+              id: client.client_id,
+              label: client.client_name,
+              value: 1,
+              color: colors.primary,
+              type: 'client',
+              parentId: selectedCategoryForPayment.id,
+            }));
+
+            setPaymentChartData(chartData);
+          }
+        } else {
+          setPaymentBreadcrumb(null);
+          setPaymentChartLevel('categories');
+
+          const { data: categoryStats, error } = 
+            await paymentTrackingService.getPaymentStatsByCategory(user.id);
+
+          if (error) throw error;
+
+          const chartData: PaymentChartData[] = (categoryStats || [])
+            .filter(cat => cat.unpaid_clients > 0)
+            .map(cat => ({
+              id: cat.category_id,
+              label: cat.category_name,
+              value: cat.unpaid_clients,
+              color: cat.color,
+              icon: cat.icon,
+              type: 'category',
+            }));
+
+          setPaymentChartData(chartData);
+        }
       } else {
-        // Pokazuj wszystkich nieopłaconych klientów
+        setPaymentBreadcrumb(null);
+        setPaymentChartLevel('clients');
+
         const { data: unpaidClients, error } = 
           await paymentTrackingService.getUnpaidClientsCurrentMonth(user.id);
 
@@ -223,6 +288,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
           label: client.client_name,
           value: 1,
           color: colors.primary,
+          type: 'client',
         }));
 
         setPaymentChartData(chartData);
@@ -235,19 +301,33 @@ export default function PaymentAlertsScreen({ navigation }: any) {
   };
 
   const handlePaymentBarPress = (item: PaymentChartData) => {
-    if (paymentViewMode === 'categories') {
-      // Kliknięto kategorię → pokaż klientów z tej kategorii
-      setSelectedCategoryForPayment(item.id);
+    if (paymentViewMode !== 'categories') {
+      return;
+    }
+
+    if (!selectedCategoryForPayment && paymentChartLevel === 'categories') {
+      setSelectedCategoryForPayment({ id: item.id, label: item.label });
+      setSelectedSubcategoryForPayment(null);
+    } else if (selectedCategoryForPayment && paymentChartLevel === 'subcategories') {
+      setSelectedSubcategoryForPayment({ id: item.id, label: item.label });
     }
   };
 
   const handlePaymentViewModeChange = (mode: PaymentChartViewMode) => {
     setPaymentViewMode(mode);
-    setSelectedCategoryForPayment(null); // Reset wybranej kategorii
+    if (mode !== 'categories') {
+      setSelectedCategoryForPayment(null);
+      setSelectedSubcategoryForPayment(null);
+    }
+    setPaymentBreadcrumb(null);
   };
 
   const handlePaymentBackPress = () => {
-    setSelectedCategoryForPayment(null);
+    if (selectedSubcategoryForPayment) {
+      setSelectedSubcategoryForPayment(null);
+    } else if (selectedCategoryForPayment) {
+      setSelectedCategoryForPayment(null);
+    }
   };
 
   const handleAddPayment = async () => {
@@ -365,7 +445,10 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
   const maxRevenue = Math.max(...revenueData.map((d) => d.amount), 100);
 
+  const dismissKeyboard = () => Keyboard.dismiss();
+
   return (
+    <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -385,7 +468,11 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <Animated.View entering={FadeInDown.delay(0)} style={styles.statCard}>
@@ -496,8 +583,14 @@ export default function PaymentAlertsScreen({ navigation }: any) {
             onViewModeChange={handlePaymentViewModeChange}
             onBarPress={handlePaymentBarPress}
             loading={loadingPaymentData}
-            selectedCategory={selectedCategoryForPayment}
+            selectedCategory={
+              selectedSubcategoryForPayment?.id ||
+              selectedCategoryForPayment?.id ||
+              null
+            }
             onBackPress={handlePaymentBackPress}
+            level={paymentChartLevel}
+            breadcrumbLabel={paymentBreadcrumb}
           />
         </Animated.View>
 
@@ -618,7 +711,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setShowAddPaymentModal(false)}
       >
+        <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
         <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => {}} accessible={false}>
           <View style={styles.formModal}>
             <View style={styles.formHeader}>
               <Text style={styles.formTitle}>Add Payment</Text>
@@ -673,7 +768,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
               <Text style={styles.submitButtonText}>Add Payment</Text>
             </TouchableOpacity>
           </View>
+          </TouchableWithoutFeedback>
         </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Add Overdue Modal */}
@@ -683,7 +780,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setShowAddOverdueModal(false)}
       >
+        <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
         <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => {}} accessible={false}>
           <View style={styles.formModal}>
             <View style={styles.formHeader}>
               <Text style={styles.formTitle}>Add Overdue</Text>
@@ -738,7 +837,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
               <Text style={styles.submitButtonText}>Add Overdue</Text>
             </TouchableOpacity>
           </View>
+          </TouchableWithoutFeedback>
         </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Client Selector Modal */}
@@ -748,7 +849,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         animationType="slide"
         onRequestClose={() => setShowClientSelector(false)}
       >
+        <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
         <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => {}} accessible={false}>
           <View style={styles.clientSelectorModal}>
             <View style={styles.formHeader}>
               <Text style={styles.formTitle}>Select Client</Text>
@@ -786,7 +889,11 @@ export default function PaymentAlertsScreen({ navigation }: any) {
             </View>
 
             {/* Client List */}
-            <ScrollView style={styles.clientList} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.clientList} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               {clients
                 .filter(client => 
                   client.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -836,7 +943,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
               )}
             </ScrollView>
           </View>
+          </TouchableWithoutFeedback>
         </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* Success Modals */}
@@ -856,6 +965,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         onClose={() => setShowMarkPaidSuccessModal(false)}
       />
     </View>
+    </TouchableWithoutFeedback>
   );
 }
 

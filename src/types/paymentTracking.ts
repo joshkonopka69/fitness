@@ -46,6 +46,21 @@ export interface PaymentStatsByCategory {
   unpaid_clients: number;
 }
 
+export interface PaymentStatsBySubcategory {
+  subcategory_id: string;
+  subcategory_name: string;
+  parent_category_id: string;
+  parent_category_name: string | null;
+  coach_id: string;
+  color: string;
+  icon: string;
+  year: number;
+  month: number;
+  total_clients: number;
+  paid_clients: number;
+  unpaid_clients: number;
+}
+
 export interface PaymentStats {
   total_clients: number;
   paid_clients: number;
@@ -60,6 +75,8 @@ export interface PaymentChartData {
   color: string;
   icon?: string;
   id: string; // category_id lub client_id
+  type?: 'category' | 'subcategory' | 'client';
+  parentId?: string;
 }
 
 export type PaymentChartViewMode = 'categories' | 'individuals';

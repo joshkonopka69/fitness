@@ -331,7 +331,6 @@ export default function ClientsScreen({ navigation }: any) {
             ]}
             onPress={() => setSelectedCategory(null)}
           >
-            <Text style={styles.categoryIcon}>👥</Text>
             <Text style={styles.categoryName}>Wszystkie</Text>
             <Text style={styles.categoryCount}>{clients.length}</Text>
           </TouchableOpacity>
@@ -352,7 +351,6 @@ export default function ClientsScreen({ navigation }: any) {
                 setShowOptionsModal(true);
               }}
             >
-              <Text style={styles.categoryIcon}>{category.icon}</Text>
               <Text style={styles.categoryName} numberOfLines={1}>
                 {category.name}
               </Text>
@@ -423,7 +421,6 @@ export default function ClientsScreen({ navigation }: any) {
                   activeOpacity={0.7}
                 >
                   <View style={styles.subcategoryCardContent}>
-                    <Text style={styles.subcategoryCardIconLarge}>{sub.icon}</Text>
                     <View style={styles.subcategoryCardInfo}>
                       <Text style={styles.subcategoryCardNameLarge} numberOfLines={2}>
                         {sub.name}
@@ -709,10 +706,6 @@ const styles = StyleSheet.create({
   categoryTileSelected: {
     backgroundColor: '#F0F8FF',
   },
-  categoryIcon: {
-    fontSize: 32,
-    marginBottom: 4,
-  },
   categoryName: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 13,
@@ -743,10 +736,6 @@ const styles = StyleSheet.create({
     width: 100,
     padding: 10,
     opacity: 0.95,
-  },
-  subcategoryIcon: {
-    fontSize: 24,
-    marginBottom: 4,
   },
   subcategoryName: {
     fontFamily: 'Poppins-Medium',
@@ -984,10 +973,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  subcategoryCardIconLarge: {
-    fontSize: 36,
-    marginRight: 16,
   },
   subcategoryCardInfo: {
     flex: 1,

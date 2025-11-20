@@ -142,6 +142,42 @@ GROUP BY cc.id, cc.name, cc.coach_id, cc.color, cc.icon;
 
 COMMENT ON VIEW payment_stats_by_category IS 'Statystyki płatności per kategoria (główna) w bieżącym miesiącu';
 
+-- Widok: Statystyki płatności dla podkategorii (subgrup)
+DROP VIEW IF EXISTS payment_stats_by_subcategory;
+CREATE OR REPLACE VIEW payment_stats_by_subcategory AS
+SELECT 
+  cc.id as subcategory_id,
+  cc.name as subcategory_name,
+  cc.parent_category_id,
+  parent.name as parent_category_name,
+  cc.coach_id,
+  cc.color,
+  cc.icon,
+  EXTRACT(YEAR FROM NOW())::INTEGER as year,
+  EXTRACT(MONTH FROM NOW())::INTEGER as month,
+  COUNT(DISTINCT c.id) as total_clients,
+  COUNT(DISTINCT CASE WHEN mpt.has_paid = TRUE THEN c.id END) as paid_clients,
+  COUNT(DISTINCT CASE WHEN mpt.has_paid = FALSE OR mpt.has_paid IS NULL THEN c.id END) as unpaid_clients
+FROM client_categories cc
+LEFT JOIN client_categories parent ON parent.id = cc.parent_category_id
+LEFT JOIN client_category_assignments cca ON cca.category_id = cc.id
+LEFT JOIN clients c ON c.id = cca.client_id AND c.active = TRUE
+LEFT JOIN monthly_payment_tracking mpt 
+  ON mpt.client_id = c.id 
+  AND mpt.year = EXTRACT(YEAR FROM NOW())::INTEGER
+  AND mpt.month = EXTRACT(MONTH FROM NOW())::INTEGER
+WHERE cc.parent_category_id IS NOT NULL
+GROUP BY 
+  cc.id, 
+  cc.name, 
+  cc.parent_category_id, 
+  parent.name,
+  cc.coach_id, 
+  cc.color, 
+  cc.icon;
+
+COMMENT ON VIEW payment_stats_by_subcategory IS 'Statystyki płatności dla podkategorii (subgrup) w bieżącym miesiącu';
+
 -- ===============================================
 -- 6. FUNKCJE POMOCNICZE
 -- ===============================================
