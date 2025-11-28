@@ -39,8 +39,8 @@ if (fs.existsSync('.env')) {
     if (urlMatch && urlMatch[1].trim() && !urlMatch[1].includes('YOUR_PROJECT')) {
       console.log('   ✅ EXPO_PUBLIC_SUPABASE_URL is set');
     } else {
-      console.log('   ⚠️  EXPO_PUBLIC_SUPABASE_URL contains placeholder value');
-      console.log('      Update it with your actual Supabase project URL');
+    console.log('   ⚠️  EXPO_PUBLIC_SUPABASE_URL contains placeholder value');
+    console.log('      Set it to https://qkkmurwntbkhvbezbhcz.supabase.co (legacy project ref)');
       hasWarnings = true;
     }
   } else {
@@ -64,8 +64,8 @@ if (fs.existsSync('.env')) {
 } else {
   console.log('   ❌ .env file not found');
   console.log('      Create a .env file in the root directory with:');
-  console.log('      EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co');
-  console.log('      EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key');
+  console.log('      EXPO_PUBLIC_SUPABASE_URL=https://qkkmurwntbkhvbezbhcz.supabase.co');
+  console.log('      EXPO_PUBLIC_SUPABASE_ANON_KEY=copy_from_Supabase_Settings_API');
   hasErrors = true;
 }
 

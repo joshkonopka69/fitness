@@ -1,36 +1,33 @@
-# 🏃 START APP LOCALLY WITH EXPO GO
+# FitnessGuru - Start App with Expo Go
+# =====================================
 
-Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║                                                                ║" -ForegroundColor Cyan
-Write-Host "║  📱  START FITNESSGURU LOCALLY                                 ║" -ForegroundColor Cyan
-Write-Host "║                                                                ║" -ForegroundColor Cyan
-Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "   FITNESSGURU - Expo Go Starter" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "🚀 Starting Expo development server..." -ForegroundColor Green
+# Get WiFi IP address
+$wifiIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -match "Wi-Fi|WiFi|Wireless" -and $_.IPAddress -notlike "169.*" } | Select-Object -First 1).IPAddress
+
+if ($wifiIP) {
+    Write-Host "Your WiFi IP: $wifiIP" -ForegroundColor Green
+} else {
+    $wifiIP = "192.168.0.188"
+    Write-Host "Using default IP: $wifiIP" -ForegroundColor Yellow
+}
+
 Write-Host ""
-Write-Host "This will:"
-Write-Host "  ✓ Clear cache"
-Write-Host "  ✓ Start Metro bundler"
-Write-Host "  ✓ Show QR code to scan"
-Write-Host ""
-Write-Host "📱 On your phone:" -ForegroundColor Yellow
-Write-Host "  1. Install 'Expo Go' from Play Store (if not installed)"
-Write-Host "  2. Open Expo Go app"
+Write-Host "INSTRUCTIONS:" -ForegroundColor Yellow
+Write-Host "  1. Make sure phone is on SAME WiFi network"
+Write-Host "  2. Open Expo Go app on your phone"
 Write-Host "  3. Scan the QR code that appears below"
-Write-Host "  4. Your app will load!"
 Write-Host ""
-Write-Host "📸 PERFECT FOR:" -ForegroundColor Magenta
-Write-Host "  • Taking screenshots for Google Play"
-Write-Host "  • Testing before friends download"
-Write-Host "  • Recording demo videos"
-Write-Host "  • Final testing"
-Write-Host ""
-Write-Host "Press Ctrl+C to stop the server when done." -ForegroundColor Red
-Write-Host ""
-Write-Host "Starting in 3 seconds..."
+Write-Host "Starting Expo in 3 seconds..." -ForegroundColor Green
 Start-Sleep -Seconds 3
 
-# Start with clear cache (without fixed port to avoid conflicts)
-npx expo start --clear
+# Set environment variable for LAN access
+$env:REACT_NATIVE_PACKAGER_HOSTNAME = $wifiIP
 
+# Start Expo with LAN mode
+npx expo start --lan --clear

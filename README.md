@@ -72,8 +72,8 @@ EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 EXPO_PUBLIC_STRIPE_PRICE_MONTHLY=your_price_id
 EXPO_PUBLIC_STRIPE_PRICE_YEARLY=your_price_id
 STRIPE_SECRET_KEY=your_stripe_secret_key
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_SUPABASE_URL=https://qkkmurwntbkhvbezbhcz.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=copy_from_Supabase_Settings_API
 ```
 
 ### Database Setup

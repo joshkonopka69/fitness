@@ -1,19 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  SlideInRight,
+} from 'react-native-reanimated';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors } from '../../theme/colors';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -24,272 +29,374 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 
   const features = [
     {
-      icon: 'calendar' as const,
+      icon: 'fitness-outline' as const,
       title: t('welcome.sessionManagement'),
-      description: t('welcome.sessionManagementDesc'),
+      gradient: ['#00FF88', '#00CC6A'],
     },
     {
-      icon: 'people' as const,
+      icon: 'people-outline' as const,
       title: t('welcome.clientTracking'),
-      description: t('welcome.clientTrackingDesc'),
+      gradient: ['#0EA5E9', '#0284C7'],
     },
     {
-      icon: 'trending-up' as const,
+      icon: 'stats-chart-outline' as const,
       title: t('welcome.analytics'),
-      description: t('welcome.analyticsDesc'),
+      gradient: ['#8B5CF6', '#7C3AED'],
     },
     {
-      icon: 'card' as const,
+      icon: 'wallet-outline' as const,
       title: t('welcome.paymentTracking'),
-      description: t('welcome.paymentTrackingDesc'),
+      gradient: ['#F59E0B', '#D97706'],
     },
   ];
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Animated background elements */}
-      <Animated.View entering={FadeIn.duration(1000)} style={styles.bgGradient1} />
-      <Animated.View entering={FadeIn.duration(1000).delay(200)} style={styles.bgGradient2} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Animated Background Orbs */}
+      <Animated.View entering={FadeIn.duration(1500)} style={styles.orb1} />
+      <Animated.View entering={FadeIn.duration(1500).delay(300)} style={styles.orb2} />
+      <Animated.View entering={FadeIn.duration(1500).delay(600)} style={styles.orb3} />
 
-      <View style={styles.innerContent}>
-        {/* Language Toggle */}
-        <Animated.View entering={FadeInUp.delay(50)} style={styles.languageToggle}>
-          <TouchableOpacity
-            style={[styles.langButton, language === 'en' && styles.langButtonActive]}
-            onPress={() => setLanguage('en')}
+      {/* Language Toggle */}
+      <Animated.View entering={FadeInDown.delay(200)} style={styles.languageToggle}>
+        <TouchableOpacity
+          style={[styles.langButton, language === 'en' && styles.langButtonActive]}
+          onPress={() => setLanguage('en')}
+        >
+          <Text style={[styles.langText, language === 'en' && styles.langTextActive]}>EN</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.langButton, language === 'pl' && styles.langButtonActive]}
+          onPress={() => setLanguage('pl')}
+        >
+          <Text style={[styles.langText, language === 'pl' && styles.langTextActive]}>PL</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Hero Section */}
+      <Animated.View entering={FadeInUp.delay(100)} style={styles.heroSection}>
+        {/* Glowing Logo */}
+        <Animated.View entering={FadeInUp.delay(200).springify()} style={styles.logoWrapper}>
+          <LinearGradient
+            colors={['#00FF88', '#00CC6A', '#00FF88']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.logoGradient}
           >
-            <Text style={[styles.langButtonText, language === 'en' && styles.langButtonTextActive]}>
-              EN
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.langButton, language === 'pl' && styles.langButtonActive]}
-            onPress={() => setLanguage('pl')}
-          >
-            <Text style={[styles.langButtonText, language === 'pl' && styles.langButtonTextActive]}>
-              PL
-            </Text>
-          </TouchableOpacity>
+            <Ionicons name="barbell" size={48} color="#000" />
+          </LinearGradient>
+          <View style={styles.logoGlow} />
         </Animated.View>
 
-        {/* Logo & Title */}
-        <Animated.View entering={FadeInUp.delay(100)} style={styles.header}>
-          <Animated.View entering={FadeInUp.delay(200).springify()} style={styles.logoContainer}>
-            <Image 
-              source={require('../../../assets/images/icon.png')} 
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </Animated.View>
-          <Text style={styles.title}>{t('welcome.title')}</Text>
-          <Text style={styles.subtitle}>
-            {t('welcome.subtitle')}
-          </Text>
+        {/* Title with Gradient Effect */}
+        <Animated.View entering={FadeInUp.delay(300)}>
+          <Text style={styles.brandName}>FitnessGuru</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.titleWhite}>{t('welcome.title').split(' ')[0]} </Text>
+            <Text style={styles.titleGreen}>{t('welcome.title').split(' ').slice(1).join(' ')}</Text>
+          </View>
         </Animated.View>
 
-        {/* Features Grid */}
-        <View style={styles.featuresGrid}>
+        <Animated.Text entering={FadeInUp.delay(400)} style={styles.subtitle}>
+          {t('welcome.subtitle')}
+        </Animated.Text>
+      </Animated.View>
+
+      {/* Feature Pills */}
+      <Animated.View entering={FadeInUp.delay(500)} style={styles.featuresContainer}>
+        <View style={styles.featuresRow}>
           {features.map((feature, index) => (
             <Animated.View
               key={feature.title}
-              entering={FadeInUp.delay(400 + index * 100).springify()}
-              style={styles.featureCard}
+              entering={SlideInRight.delay(600 + index * 100).springify()}
             >
-              <View style={styles.featureIconContainer}>
-                <Ionicons name={feature.icon} size={24} color={colors.primary} />
-              </View>
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>{feature.title}</Text>
-                <Text style={styles.featureDescription}>{feature.description}</Text>
-              </View>
+              <LinearGradient
+                colors={feature.gradient as [string, string]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.featurePill}
+              >
+                <Ionicons name={feature.icon} size={18} color="#000" />
+                <Text style={styles.featurePillText}>{feature.title}</Text>
+              </LinearGradient>
             </Animated.View>
           ))}
         </View>
+      </Animated.View>
+
+      {/* Bottom Section */}
+      <View style={styles.bottomSection}>
+        {/* Stats */}
+        <Animated.View entering={FadeInUp.delay(800)} style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>10K+</Text>
+            <Text style={styles.statLabel}>Coaches</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>50K+</Text>
+            <Text style={styles.statLabel}>Clients</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>4.9★</Text>
+            <Text style={styles.statLabel}>Rating</Text>
+          </View>
+        </Animated.View>
 
         {/* CTA Button */}
-        <Animated.View entering={FadeInUp.delay(800)}>
+        <Animated.View entering={FadeInUp.delay(900)}>
           <TouchableOpacity
-            style={styles.button}
+            style={styles.ctaButton}
             onPress={() => navigation.navigate('Login')}
             activeOpacity={0.9}
           >
-            <Text style={styles.buttonText}>{t('welcome.getStarted')}</Text>
+            <LinearGradient
+              colors={['#00FF88', '#00E67A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.ctaGradient}
+            >
+              <Text style={styles.ctaText}>{t('welcome.getStarted')}</Text>
+              <View style={styles.ctaIconWrapper}>
+                <Ionicons name="arrow-forward" size={20} color="#000" />
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
-          <Text style={styles.footerText}>{t('welcome.footer')}</Text>
         </Animated.View>
+
+        {/* Footer */}
+        <Animated.Text entering={FadeIn.delay(1000)} style={styles.footerText}>
+          {t('welcome.footer')}
+        </Animated.Text>
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#050505',
   },
-  content: {
-    flexGrow: 1,
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  bgGradient1: {
+  // Background orbs
+  orb1: {
     position: 'absolute',
-    top: -200,
-    right: -200,
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: `${colors.primary}0D`,
-    opacity: 0.5,
+    top: -100,
+    right: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: '#00FF88',
+    opacity: 0.08,
   },
-  bgGradient2: {
+  orb2: {
     position: 'absolute',
-    bottom: -200,
-    left: -200,
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: `${colors.secondary}0D`,
-    opacity: 0.5,
+    top: height * 0.3,
+    left: -150,
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    backgroundColor: '#0EA5E9',
+    opacity: 0.06,
   },
-  innerContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    maxWidth: 600,
-    alignSelf: 'center',
-    width: '100%',
+  orb3: {
+    position: 'absolute',
+    bottom: -100,
+    right: -50,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: '#8B5CF6',
+    opacity: 0.08,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 48,
-  },
-  logoContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 30,
-    backgroundColor: `${colors.primary}15`,
-    borderWidth: 3,
-    borderColor: `${colors.primary}40`,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  logoImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 20,
-  },
+  // Language toggle
   languageToggle: {
     position: 'absolute',
-    top: 20,
+    top: 60,
     right: 24,
     flexDirection: 'row',
-    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+    padding: 4,
     zIndex: 10,
   },
   langButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: 10,
   },
   langButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#00FF88',
   },
-  langButtonText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.textSecondary,
+  langText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
   },
-  langButtonTextActive: {
-    color: colors.background,
+  langTextActive: {
+    color: '#000',
   },
-  title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 12,
-    letterSpacing: -1,
+  // Hero section
+  heroSection: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 80,
   },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 24,
+  logoWrapper: {
+    position: 'relative',
+    marginBottom: 32,
   },
-  featuresGrid: {
-    gap: 16,
-    marginBottom: 48,
-  },
-  featureCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    padding: 20,
-    gap: 16,
-  },
-  featureIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: `${colors.primary}10`,
-    borderWidth: 1,
-    borderColor: `${colors.primary}20`,
+  logoGradient: {
+    width: 96,
+    height: 96,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureContent: {
-    flex: 1,
+  logoGlow: {
+    position: 'absolute',
+    top: -10,
+    left: -10,
+    right: -10,
+    bottom: -10,
+    borderRadius: 38,
+    backgroundColor: '#00FF88',
+    opacity: 0.2,
+    zIndex: -1,
   },
-  featureTitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  featureDescription: {
+  brandName: {
     fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
+    fontWeight: '600',
+    color: '#00FF88',
+    textAlign: 'center',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+    marginBottom: 8,
   },
-  button: {
-    backgroundColor: colors.primary,
-    paddingVertical: 18,
-    paddingHorizontal: 48,
-    borderRadius: 16,
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  titleWhite: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#FFF',
+    textAlign: 'center',
+  },
+  titleGreen: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#00FF88',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 24,
+    maxWidth: 300,
+  },
+  // Features
+  featuresContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  featuresRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  featurePill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
+  },
+  featurePillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000',
+  },
+  // Bottom section
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    paddingVertical: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#00FF88',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  // CTA Button
+  ctaButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#00FF88',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 16,
     elevation: 8,
   },
-  buttonText: {
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.background,
+  ctaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 32,
+    gap: 12,
+  },
+  ctaText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000',
+  },
+  ctaIconWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footerText: {
     fontSize: 12,
-    color: colors.textSecondary,
+    color: 'rgba(255,255,255,0.4)',
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 20,
   },
 });
-
-
-

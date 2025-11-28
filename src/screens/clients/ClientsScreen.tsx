@@ -79,8 +79,8 @@ export default function ClientsScreen({ navigation }: any) {
     const clientsWithPaymentStatus = await Promise.all(
       data.map(async (client) => {
         // Kategorie
-        const categoryIds = await categoryService.getClientCategoryIds(client.id);
-        categoryMap.set(client.id, categoryIds);
+      const categoryIds = await categoryService.getClientCategoryIds(client.id);
+      categoryMap.set(client.id, categoryIds);
         
         // Status płatności
         const { has_paid } = await paymentTrackingService.getClientPaymentStatus(client.id);
@@ -255,7 +255,7 @@ export default function ClientsScreen({ navigation }: any) {
   };
 
   // Filtruj klientów
-  const filteredClients = clients.filter((client) => {
+  const filteredClients = clients.filter((client: Client) => {
     // Filtr wyszukiwania
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -269,23 +269,76 @@ export default function ClientsScreen({ navigation }: any) {
     if (selectedCategory) {
       // Wybrana kategoria - pokaż tylko klientów z tej kategorii
       const clientCategories = clientCategoryIds.get(client.id) || [];
-      const isInCategory = clientCategories.includes(selectedCategory);
-      
-      // Debug log
-      console.log('Client:', client.name, 'Categories:', clientCategories, 'Selected:', selectedCategory, 'Match:', isInCategory);
-      
-      return isInCategory;
-    } else {
-      // "Wszystkie" - pokaż TYLKO klientów BEZ żadnej kategorii (prywatne lekcje)
-      const clientCategories = clientCategoryIds.get(client.id) || [];
-      const hasNoCategories = clientCategories.length === 0;
-      
-      // Debug log
-      console.log('Client:', client.name, 'Categories:', clientCategories, 'Has no categories:', hasNoCategories);
-      
-      return hasNoCategories;
+      return clientCategories.includes(selectedCategory);
     }
+    
+    // "Wszystkie" - pokaż WSZYSTKICH klientów
+    return true;
   });
+
+  // Grupuj klientów według kategorii dla wyświetlania
+  const getClientsGroupedByCategory = () => {
+    if (selectedCategory) {
+      // Wybrana kategoria - zwróć tylko filtrowanych klientów
+      return [{ category: null, clients: filteredClients }];
+    }
+
+    // "Wszystkie" - grupuj klientów według kategorii
+    const grouped: { category: ClientCategory | null; clients: Client[] }[] = [];
+    
+    // Najpierw klienci bez kategorii
+    const uncategorizedClients = clients.filter((client: Client) => {
+      const clientCategories = clientCategoryIds.get(client.id) || [];
+      return clientCategories.length === 0;
+    }).filter((client: Client) => {
+      if (!searchQuery.trim()) return true;
+      const query = searchQuery.toLowerCase();
+      return client.name.toLowerCase().includes(query) ||
+        (client.phone && client.phone.includes(query));
+    });
+    
+    if (uncategorizedClients.length > 0) {
+      grouped.push({ category: null, clients: uncategorizedClients });
+    }
+
+    // Następnie klienci pogrupowani według kategorii
+    categories.forEach((category: ClientCategory) => {
+      const categoryClients = clients.filter((client: Client) => {
+        const clientCategories = clientCategoryIds.get(client.id) || [];
+        return clientCategories.includes(category.id);
+      }).filter((client: Client) => {
+        if (!searchQuery.trim()) return true;
+        const query = searchQuery.toLowerCase();
+        return client.name.toLowerCase().includes(query) ||
+          (client.phone && client.phone.includes(query));
+      });
+      
+      if (categoryClients.length > 0) {
+        grouped.push({ category, clients: categoryClients });
+      }
+      
+      // Dodaj także klientów z podkategorii
+      category.subcategories?.forEach((subcategory: ClientCategory) => {
+        const subClients = clients.filter((client: Client) => {
+          const clientCategories = clientCategoryIds.get(client.id) || [];
+          return clientCategories.includes(subcategory.id);
+        }).filter((client: Client) => {
+          if (!searchQuery.trim()) return true;
+          const query = searchQuery.toLowerCase();
+          return client.name.toLowerCase().includes(query) ||
+            (client.phone && client.phone.includes(query));
+        });
+        
+        if (subClients.length > 0) {
+          grouped.push({ category: subcategory, clients: subClients });
+        }
+      });
+    });
+
+    return grouped;
+  };
+
+  const groupedClients = getClientsGroupedByCategory();
 
   return (
     <View style={styles.container}>
@@ -336,7 +389,7 @@ export default function ClientsScreen({ navigation }: any) {
           </TouchableOpacity>
 
           {/* TYLKO Kategorie Główne (bez podkategorii) */}
-          {categories.map((category) => (
+          {categories.map((category: ClientCategory) => (
             <TouchableOpacity
               key={category.id}
               style={[
@@ -403,14 +456,14 @@ export default function ClientsScreen({ navigation }: any) {
 
       {/* Podkategorie jako Lista Kafelków (gdy wybrana kategoria główna) */}
       {selectedCategory && (() => {
-        const selectedCat = categories.find(c => c.id === selectedCategory);
+        const selectedCat = categories.find((c: ClientCategory) => c.id === selectedCategory);
         const subcategories = selectedCat?.subcategories || [];
         
         if (subcategories.length > 0) {
           return (
             <View style={styles.subcategoriesGrid}>
               <Text style={styles.subcategoriesTitle}>Grupy w tej kategorii:</Text>
-              {subcategories.map((sub) => (
+              {subcategories.map((sub: ClientCategory) => (
                 <TouchableOpacity
                   key={sub.id}
                   style={[
@@ -433,7 +486,7 @@ export default function ClientsScreen({ navigation }: any) {
                   
                   <TouchableOpacity
                     style={styles.subcategoryCardOptions}
-                    onPress={(e) => {
+                    onPress={(e: any) => {
                       e.stopPropagation();
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       setSelectedCategoryForAction(sub);
@@ -458,70 +511,124 @@ export default function ClientsScreen({ navigation }: any) {
         contentContainerStyle={styles.clientsListContent}
       >
         {filteredClients.length > 0 ? (
-          filteredClients.map((client, index) => (
-            <Animated.View key={client.id} entering={FadeInUp.delay(index * 30).springify()}>
-              <TouchableOpacity
-                style={styles.clientCard}
-                onPress={() => navigation.navigate('ClientDetail', { clientId: client.id })}
-                onLongPress={() => handleTogglePaymentStatus(client)}
-                activeOpacity={0.8}
-              >
-                {/* Avatar */}
-                <LinearGradient
-                  colors={[colors.primary, colors.secondary]}
-                  style={styles.clientAvatar}
+          // Gdy wybrana kategoria - pokaż bez grupowania
+          selectedCategory ? (
+            filteredClients.map((client: Client, index: number) => (
+              <Animated.View key={client.id} entering={FadeInUp.delay(index * 30).springify()}>
+                <TouchableOpacity
+                  style={styles.clientCard}
+                  onPress={() => navigation.navigate('ClientDetail', { clientId: client.id })}
+                  onLongPress={() => handleTogglePaymentStatus(client)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.clientAvatarText}>
-                    {client.name.charAt(0).toUpperCase()}
-                  </Text>
-                </LinearGradient>
-
-                {/* Info */}
-                <View style={styles.clientInfo}>
-                  <View style={styles.clientNameRow}>
-                    <Text style={styles.clientName} numberOfLines={1}>
-                      {client.name}
-                    </Text>
-                    {/* Payment Status Badge */}
-                    {client.has_paid ? (
-                      <View style={styles.paidBadge}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                      </View>
-                    ) : (
-                      <View style={styles.unpaidBadge}>
-                        <Ionicons name="alert-circle" size={16} color={colors.error} />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.clientPhone} numberOfLines={1}>
-                    {client.phone || 'No phone number'}
-                  </Text>
-                  {client.active && (
-                    <View style={styles.statusBadge}>
-                      <View style={styles.statusDot} />
-                      <Text style={styles.statusText}>Active</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Call Button */}
-                {client.phone && (
-                  <TouchableOpacity
-                    style={styles.callButton}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleCall(client.phone);
-                    }}
+                  <LinearGradient
+                    colors={[colors.primary, colors.secondary]}
+                    style={styles.clientAvatar}
                   >
-                    <Ionicons name="call" size={20} color={colors.primary} />
-                  </TouchableOpacity>
-                )}
-
-                {/* Chevron */}
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </Animated.View>
-          ))
+                    <Text style={styles.clientAvatarText}>
+                      {client.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </LinearGradient>
+                  <View style={styles.clientInfo}>
+                    <View style={styles.clientNameRow}>
+                      <Text style={styles.clientName} numberOfLines={1}>{client.name}</Text>
+                      {client.has_paid ? (
+                        <View style={styles.paidBadge}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                        </View>
+                      ) : (
+                        <View style={styles.unpaidBadge}>
+                          <Ionicons name="alert-circle" size={16} color={colors.destructive} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.clientPhone} numberOfLines={1}>
+                      {client.phone || 'No phone number'}
+                    </Text>
+                  </View>
+                  {client.phone && (
+                    <TouchableOpacity
+                      style={styles.callButton}
+                      onPress={(e: any) => { e.stopPropagation(); handleCall(client.phone); }}
+                    >
+                      <Ionicons name="call" size={20} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                  <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </Animated.View>
+            ))
+          ) : (
+            // "Wszystkie" - pokaż pogrupowanych klientów
+            groupedClients.map((group: { category: ClientCategory | null; clients: Client[] }, groupIndex: number) => (
+              <View key={group.category?.id || 'uncategorized'}>
+                {/* Section Header */}
+                <View style={[
+                  styles.sectionHeader,
+                  group.category && { borderLeftColor: group.category.color, borderLeftWidth: 4 }
+                ]}>
+                  <Ionicons 
+                    name={group.category ? 'folder' : 'person'} 
+                    size={18} 
+                    color={group.category?.color || colors.textSecondary} 
+                  />
+                  <Text style={styles.sectionTitle}>
+                    {group.category?.name || 'Prywatne lekcje'}
+                  </Text>
+                  <View style={styles.sectionCount}>
+                    <Text style={styles.sectionCountText}>{group.clients.length}</Text>
+                  </View>
+                </View>
+                
+                {/* Clients in this group */}
+                {group.clients.map((client: Client, index: number) => (
+                  <Animated.View key={client.id} entering={FadeInUp.delay((groupIndex * 10 + index) * 20).springify()}>
+                    <TouchableOpacity
+                      style={styles.clientCard}
+                      onPress={() => navigation.navigate('ClientDetail', { clientId: client.id })}
+                      onLongPress={() => handleTogglePaymentStatus(client)}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={[group.category?.color || colors.primary, colors.secondary]}
+                        style={styles.clientAvatar}
+                      >
+                        <Text style={styles.clientAvatarText}>
+                          {client.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </LinearGradient>
+                      <View style={styles.clientInfo}>
+                        <View style={styles.clientNameRow}>
+                          <Text style={styles.clientName} numberOfLines={1}>{client.name}</Text>
+                          {client.has_paid ? (
+                            <View style={styles.paidBadge}>
+                              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                            </View>
+                          ) : (
+                            <View style={styles.unpaidBadge}>
+                              <Ionicons name="alert-circle" size={16} color={colors.destructive} />
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.clientPhone} numberOfLines={1}>
+                          {client.phone || 'No phone number'}
+                        </Text>
+                      </View>
+                      {client.phone && (
+                        <TouchableOpacity
+                          style={styles.callButton}
+                          onPress={(e: any) => { e.stopPropagation(); handleCall(client.phone); }}
+                        >
+                          <Ionicons name="call" size={20} color={colors.primary} />
+                        </TouchableOpacity>
+                      )}
+                      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+            ))
+          )
         ) : (
           <Animated.View entering={FadeInUp.delay(100)} style={styles.emptyState}>
             <Ionicons name="people-outline" size={64} color={colors.textSecondary} />
@@ -607,7 +714,7 @@ export default function ClientsScreen({ navigation }: any) {
             </View>
 
             <ScrollView style={styles.pickerList}>
-              {clients.map((client) => {
+              {clients.map((client: Client) => {
                 const isAssigned = clientCategoryIds
                   .get(client.id)
                   ?.includes(selectedCategoryForAction?.id || '') || false;
@@ -787,6 +894,36 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    marginTop: 8,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 10,
+  },
+  sectionTitle: {
+    flex: 1,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  sectionCount: {
+    backgroundColor: colors.primary + '20',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  sectionCountText: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 12,
+    color: colors.primary,
+  },
   clientCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -837,7 +974,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: `${colors.error}20`,
+    backgroundColor: `${colors.destructive}20`,
     alignItems: 'center',
     justifyContent: 'center',
   },

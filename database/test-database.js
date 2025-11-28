@@ -40,8 +40,8 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('YOUR_PROJECT') || supabaseAnonKey.includes('YOUR_ANON_KEY')) {
   log.error('Please set your Supabase credentials in .env file:');
-  log.info('EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co');
-  log.info('EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here');
+  log.info('EXPO_PUBLIC_SUPABASE_URL=https://qkkmurwntbkhvbezbhcz.supabase.co');
+  log.info('EXPO_PUBLIC_SUPABASE_ANON_KEY=copy_from_Supabase_Settings_API');
   process.exit(1);
 }
 
