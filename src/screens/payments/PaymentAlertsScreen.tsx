@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import Svg, { G, Line, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Defs, G, Line, LinearGradient as SvgLinearGradient, Path, Stop, Circle, Text as SvgText } from 'react-native-svg';
 import SuccessModal from '../../components/ui/SuccessModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
@@ -78,8 +78,7 @@ const formatCurrency = (value: number) => {
 export default function PaymentAlertsScreen({ navigation }: any) {
   const { user } = useAuth();
   const [totalCollected, setTotalCollected] = useState(0);
-  const [totalOverdue, setTotalOverdue] = useState(0);
-  const [overdueClients, setOverdueClients] = useState<Client[]>([]);
+  const [totalPending, setTotalPending] = useState(0);
   const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [revenueData, setRevenueData] = useState<DailyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,9 +87,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
   // Add payment modals
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
-  const [showAddOverdueModal, setShowAddOverdueModal] = useState(false);
   const [showClientSelector, setShowClientSelector] = useState(false);
-  const [clientSelectorMode, setClientSelectorMode] = useState<'payment' | 'overdue'>('payment');
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [amount, setAmount] = useState('');
@@ -98,7 +95,6 @@ export default function PaymentAlertsScreen({ navigation }: any) {
   
   // Success modals
   const [showPaymentSuccessModal, setShowPaymentSuccessModal] = useState(false);
-  const [showOverdueSuccessModal, setShowOverdueSuccessModal] = useState(false);
   const [showMarkPaidSuccessModal, setShowMarkPaidSuccessModal] = useState(false);
 
   // Payment Tracking State
@@ -222,24 +218,11 @@ export default function PaymentAlertsScreen({ navigation }: any) {
           payment_date: p.payment_date,
         }));
         setPendingPayments(formattedPending);
+        
+        // Calculate total pending from pending payments only
+        const pendingTotal = formattedPending.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        setTotalPending(pendingTotal);
       }
-
-      // Fetch clients with balance owed
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('clients')
-        .select('id, name, balance_owed')
-        .eq('coach_id', user.id)
-        .gt('balance_owed', 0)
-        .order('balance_owed', { ascending: false });
-
-      if (clientsError) throw clientsError;
-
-      setOverdueClients(clientsData || []);
-
-      // Calculate total overdue: balance_owed from clients + pending payments
-      const clientsOverdue = (clientsData || []).reduce((sum, c) => sum + Number(c.balance_owed || 0), 0);
-      const pendingOverdue = (pendingData || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-      setTotalOverdue(clientsOverdue + pendingOverdue);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -563,116 +546,6 @@ export default function PaymentAlertsScreen({ navigation }: any) {
     }
   };
 
-  const handleAddOverdue = async () => {
-    if (!user) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
-    }
-
-    if (!selectedClient || !amount) {
-      Alert.alert('Error', 'Please select a client and enter an amount');
-      return;
-    }
-
-    const parsedAmount = parseFloat(amount.replace(',', '.'));
-    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount greater than 0');
-      return;
-    }
-
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      const client = clients.find((c: Client) => c.id === selectedClient);
-      const newBalance = (client?.balance_owed || 0) + parsedAmount;
-
-      const { error } = await supabase
-        .from('clients')
-        .update({ balance_owed: newBalance })
-        .eq('id', selectedClient)
-        .eq('coach_id', user.id);
-
-      if (error) throw error;
-
-      // Mark client as unpaid in monthly tracking (they owe money)
-      await paymentTrackingService.markClientAsUnpaid(user.id, selectedClient);
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setShowAddOverdueModal(false);
-      setSelectedClient('');
-      setAmount('');
-      setShowOverdueSuccessModal(true);
-      fetchData();
-      fetchAllClients();
-      fetchPaymentData();
-    } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', error.message);
-    }
-  };
-
-  const handleMarkPaid = async (clientId: string, clientName: string, amount: number) => {
-    if (!user) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
-    }
-
-    Alert.alert(
-      'Mark as Paid',
-      `Mark ${clientName} as paid (${formatCurrency(amount)})?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Mark Paid',
-          onPress: async () => {
-            try {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              
-              const paymentDate = new Date().toISOString().split('T')[0];
-              const { error: paymentError } = await supabase.from('payments').insert({
-                coach_id: user.id,
-                client_id: clientId,
-                amount,
-                payment_type: 'manual',
-                payment_method: 'cash',
-                status: 'completed',
-                payment_date: paymentDate,
-              });
-
-              if (paymentError) throw paymentError;
-
-              const { error: updateError } = await supabase
-                .from('clients')
-                .update({ balance_owed: 0 })
-                .eq('id', clientId)
-                .eq('coach_id', user.id);
-
-              if (updateError) throw updateError;
-
-              const { error: trackingError } = await paymentTrackingService.markClientAsPaid(
-                user.id,
-                clientId,
-                'Marked paid'
-              );
-              if (trackingError) {
-                console.warn('Failed to mark client as paid in monthly tracking:', trackingError);
-              }
-
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              setShowMarkPaidSuccessModal(true);
-              fetchData();
-              fetchPaymentData();
-              fetchAllClients();
-            } catch (error: any) {
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert('Error', error.message);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   // Mark a pending payment as completed
   const handleMarkPendingAsPaid = async (payment: PendingPayment) => {
     if (!user) {
@@ -794,9 +667,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
               <Ionicons name="time" size={28} color={colors.warning} />
             </View>
             <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Overdue</Text>
+              <Text style={styles.statLabel}>Pending</Text>
               <Text style={[styles.statValue, { color: colors.warning }]}>
-                {formatCurrency(totalOverdue)}
+                {formatCurrency(totalPending)}
           </Text>
             </View>
           </Animated.View>
@@ -817,6 +690,13 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
           <View style={styles.graphContainer}>
             <Svg width={GRAPH_WIDTH + Y_AXIS_WIDTH} height={GRAPH_HEIGHT} style={styles.graph}>
+              <Defs>
+                <SvgLinearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0%" stopColor={colors.primary} stopOpacity="0.4" />
+                  <Stop offset="100%" stopColor={colors.primary} stopOpacity="0.05" />
+                </SvgLinearGradient>
+              </Defs>
+              
               {/* Y-axis labels and grid lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((fraction: number, index: number) => {
                 const yPos = GRAPH_HEIGHT - 30 - (fraction * (GRAPH_HEIGHT - 40));
@@ -849,26 +729,55 @@ export default function PaymentAlertsScreen({ navigation }: any) {
                 );
               })}
               
-              {/* Revenue bars */}
-              {revenueData.map((item: DailyRevenue, index: number) => {
-                const barHeight = (item.amount / (maxRevenue || 1)) * (GRAPH_HEIGHT - 40);
-                const barWidth = (GRAPH_WIDTH / revenueData.length) - 6;
-                const x = Y_AXIS_WIDTH + index * (barWidth + 6);
-                const y = GRAPH_HEIGHT - 30 - barHeight;
+              {/* Area chart - filled area under the line */}
+              {revenueData.length > 0 && (() => {
+                const chartWidth = GRAPH_WIDTH;
+                const chartHeight = GRAPH_HEIGHT - 40;
+                const baseY = GRAPH_HEIGHT - 30;
+                const pointSpacing = chartWidth / Math.max(revenueData.length - 1, 1);
+                
+                // Build path for area fill
+                let areaPath = `M ${Y_AXIS_WIDTH} ${baseY}`;
+                revenueData.forEach((item, index) => {
+                  const x = Y_AXIS_WIDTH + index * pointSpacing;
+                  const y = baseY - (item.amount / (maxRevenue || 1)) * chartHeight;
+                  areaPath += ` L ${x} ${y}`;
+                });
+                areaPath += ` L ${Y_AXIS_WIDTH + (revenueData.length - 1) * pointSpacing} ${baseY} Z`;
+
+                // Build path for line
+                let linePath = '';
+                revenueData.forEach((item, index) => {
+                  const x = Y_AXIS_WIDTH + index * pointSpacing;
+                  const y = baseY - (item.amount / (maxRevenue || 1)) * chartHeight;
+                  linePath += index === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
+                });
 
                 return (
-                  <G key={`bar-${index}`}>
-                  <Rect
-                    x={x}
-                    y={y}
-                    width={barWidth}
-                    height={barHeight || 2}
-                    fill={colors.primary}
-                    rx={4}
-                  />
+                  <G>
+                    {/* Area fill */}
+                    <Path d={areaPath} fill="url(#areaGradient)" />
+                    {/* Line */}
+                    <Path d={linePath} stroke={colors.primary} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    {/* Data points */}
+                    {revenueData.map((item, index) => {
+                      const x = Y_AXIS_WIDTH + index * pointSpacing;
+                      const y = baseY - (item.amount / (maxRevenue || 1)) * chartHeight;
+                      return (
+                        <Circle
+                          key={`point-${index}`}
+                          cx={x}
+                          cy={y}
+                          r={item.amount > 0 ? 4 : 2}
+                          fill={item.amount > 0 ? colors.primary : colors.border}
+                          stroke={colors.background}
+                          strokeWidth="2"
+                        />
+                      );
+                    })}
                   </G>
                 );
-              })}
+              })()}
             </Svg>
           </View>
 
@@ -950,47 +859,8 @@ export default function PaymentAlertsScreen({ navigation }: any) {
           </Animated.View>
         )}
 
-        {/* Overdue Clients - Balance owed */}
-        {overdueClients.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(300)} style={styles.overdueSection}>
-            <View style={styles.overdueSectionHeader}>
-              <View style={styles.overdueTitleRow}>
-                <Ionicons name="alert-circle" size={20} color={colors.destructive} />
-                <Text style={styles.overdueSectionTitle}>Balance Owed</Text>
-              </View>
-              <Text style={styles.overdueCount}>{overdueClients.length} clients</Text>
-            </View>
-
-            {overdueClients.map((client: Client, index: number) => (
-              <Animated.View
-                key={client.id}
-                entering={FadeInDown.delay(350 + index * 50)}
-                style={styles.overdueCard}
-              >
-                <View style={styles.overdueLeft}>
-                  <View style={styles.overdueAvatar}>
-                    <Text style={styles.overdueAvatarText}>
-                      {client.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.overdueName}>{client.name}</Text>
-                    <Text style={styles.overdueAmount}>{formatCurrency(client.balance_owed)}</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.markPaidButton}
-                  onPress={() => handleMarkPaid(client.id, client.name, client.balance_owed)}
-                >
-                  <Text style={styles.markPaidButtonText}>Mark Paid</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </Animated.View>
-        )}
-
         {/* Empty State */}
-        {overdueClients.length === 0 && totalCollected === 0 && (
+        {pendingPayments.length === 0 && totalCollected === 0 && (
           <Animated.View entering={FadeInDown.delay(300)} style={styles.emptyState}>
             <Ionicons name="card-outline" size={64} color={colors.textSecondary} />
             <Text style={styles.emptyStateText}>No payment data yet</Text>
@@ -1030,24 +900,6 @@ export default function PaymentAlertsScreen({ navigation }: any) {
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Add Payment</Text>
                 <Text style={styles.optionSubtitle}>Record a payment received</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.optionButton}
-              onPress={() => {
-                setShowPaymentOptions(false);
-                setTimeout(() => setShowAddOverdueModal(true), 300);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: colors.warning + '20' }]}>
-                <Ionicons name="time" size={24} color={colors.warning} />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>Add Overdue</Text>
-                <Text style={styles.optionSubtitle}>Add amount owed by client</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -1093,8 +945,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.modernPicker}
               onPress={() => {
-                  dismissKeyboard();
-                setClientSelectorMode('payment');
+                dismissKeyboard();
                 setSearchQuery('');
                 setShowClientSelector(true);
               }}
@@ -1136,79 +987,6 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Overdue Modal */}
-      <Modal
-        visible={showAddOverdueModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddOverdueModal(false)}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <Pressable style={styles.modalOverlay} onPress={dismissKeyboard}>
-            <Pressable style={styles.formModal}>
-            <View style={styles.formHeader}>
-              <Text style={styles.formTitle}>Add Overdue</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowAddOverdueModal(false);
-                  setSelectedClient('');
-                  setAmount('');
-                }}
-              >
-                <Ionicons name="close" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.formLabel}>Select Client</Text>
-            <TouchableOpacity
-              style={styles.modernPicker}
-              onPress={() => {
-                  dismissKeyboard();
-                setClientSelectorMode('overdue');
-                setSearchQuery('');
-                setShowClientSelector(true);
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.pickerIconContainer}>
-                <Ionicons name="person" size={22} color={selectedClient ? colors.primary : colors.textSecondary} />
-              </View>
-              <Text style={selectedClient ? styles.pickerTextSelected : styles.pickerPlaceholder}>
-                  {selectedClient ? clients.find((c: Client) => c.id === selectedClient)?.name : 'Choose client...'}
-              </Text>
-              <Ionicons name="chevron-down-circle" size={24} color={colors.primary} />
-            </TouchableOpacity>
-
-              <Text style={styles.formLabel}>Amount (PLN)</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="time" size={20} color={colors.warning} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="numeric"
-                value={amount}
-                onChangeText={setAmount}
-                  returnKeyType="done"
-                  onSubmitEditing={dismissKeyboard}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.submitButton, { backgroundColor: colors.warning }]}
-              onPress={handleAddOverdue}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitButtonText}>Add Overdue</Text>
-            </TouchableOpacity>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
       {/* Client Selector Modal */}
       <Modal
         visible={showClientSelector}
@@ -1235,9 +1013,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
             </View>
 
             <Text style={styles.clientSelectorSubtitle}>
-              {clientSelectorMode === 'payment' 
-                ? 'Choose a client to add payment'
-                : 'Choose a client to add overdue amount'}
+              Choose a client to add payment
             </Text>
 
             {/* Search Input */}
@@ -1324,11 +1100,6 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         visible={showPaymentSuccessModal}
         message="Payment added successfully!"
         onClose={() => setShowPaymentSuccessModal(false)}
-      />
-      <SuccessModal
-        visible={showOverdueSuccessModal}
-        message="Overdue amount added successfully!"
-        onClose={() => setShowOverdueSuccessModal(false)}
       />
       <SuccessModal
         visible={showMarkPaidSuccessModal}
