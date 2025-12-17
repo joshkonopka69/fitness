@@ -861,24 +861,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   categoriesScroll: {
-    maxHeight: 80,
+    maxHeight: 100,
     marginBottom: 8,
   },
   categoriesContent: {
     paddingHorizontal: 16,
-    gap: 8,
+    gap: 10,
   },
-  // Compact pill-style category chips
+  // Balanced pill-style category chips
   categoryChip: {
-    height: 32,
-    paddingHorizontal: 12,
+    height: 38,
+    paddingHorizontal: 14,
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 19,
     borderWidth: 1.5,
     borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   categoryChipPressed: {
     opacity: 0.85,
@@ -889,24 +889,24 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontFamily: 'Poppins-Medium',
-    fontSize: 12,
+    fontSize: 13,
     color: colors.textPrimary,
   },
   categoryChipTextSelectedAll: {
     color: colors.primary,
   },
   categoryChipCountBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 5,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryChipCountText: {
     fontFamily: 'Poppins-Bold',
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textSecondary,
   },
   categoryOptionsButton: {
