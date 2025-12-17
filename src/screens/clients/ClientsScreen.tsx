@@ -448,8 +448,14 @@ export default function ClientsScreen({ navigation }: any) {
             >
               Wszystkie
             </Text>
-            <View style={styles.categoryChipCountBadge}>
-              <Text style={styles.categoryChipCountText}>{clients.length}</Text>
+            <View style={[
+              styles.categoryChipCountBadge,
+              !selectedCategory && { backgroundColor: 'rgba(255,255,255,0.25)' }
+            ]}>
+              <Text style={[
+                styles.categoryChipCountText,
+                !selectedCategory && { color: '#FFFFFF' }
+              ]}>{clients.length}</Text>
             </View>
           </Pressable>
 
@@ -861,53 +867,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   categoriesScroll: {
-    maxHeight: 100,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   categoriesContent: {
     paddingHorizontal: 16,
-    gap: 10,
+    gap: 12,
   },
-  // Balanced pill-style category chips
+  // Card-style category buttons
   categoryChip: {
-    height: 38,
-    paddingHorizontal: 14,
+    minWidth: 100,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: colors.card,
-    borderRadius: 19,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 2,
     borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   categoryChipPressed: {
-    opacity: 0.85,
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   categoryChipSelectedAll: {
     borderColor: colors.primary,
-    backgroundColor: colors.primary + '15',
+    backgroundColor: colors.primary,
   },
   categoryChipText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 13,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
     color: colors.textPrimary,
   },
   categoryChipTextSelectedAll: {
-    color: colors.primary,
+    color: '#FFFFFF',
   },
   categoryChipCountBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 6,
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    paddingHorizontal: 8,
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryChipCountText: {
     fontFamily: 'Poppins-Bold',
-    fontSize: 11,
-    color: colors.textSecondary,
+    fontSize: 12,
+    color: colors.textPrimary,
   },
   categoryOptionsButton: {
     position: 'absolute',
