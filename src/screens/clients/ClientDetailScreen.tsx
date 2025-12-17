@@ -256,18 +256,19 @@ export default function ClientDetailScreen({ navigation, route }: any) {
     );
   };
 
-  const handleDeletePayment = async (paymentId: string, amount: number, paymentStatus: 'completed' | 'pending') => {
+  const handleDeletePayment = async (paymentId: string, _amount: number, _paymentStatus: 'completed' | 'pending') => {
     Alert.alert(
-      'Delete Payment',
-      'Are you sure you want to delete this payment record?',
+      'Usuń płatność',
+      'Czy na pewno chcesz usunąć ten zapis płatności? (Saldo klienta nie zostanie zmienione)',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Anuluj', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Usuń',
           style: 'destructive',
           onPress: async () => {
             try {
-              // Delete payment
+              // Just delete the payment record - don't change balance
+              // Balance should only be changed when explicitly adding/marking payments
               const { error: deleteError } = await supabase
                 .from('payments')
                 .delete()
@@ -275,28 +276,11 @@ export default function ClientDetailScreen({ navigation, route }: any) {
 
               if (deleteError) throw deleteError;
 
-              // Update balance (reverse the original operation)
-              let newBalance = client?.balance_owed || 0;
-              if (paymentStatus === 'completed') {
-                // Was completed, so we added money - now add back to balance
-                newBalance += amount;
-              } else {
-                // Was pending, so we owed money - remove from balance
-                newBalance = Math.max(0, newBalance - amount);
-              }
-
-              const { error: updateError } = await supabase
-                .from('clients')
-                .update({ balance_owed: newBalance })
-                .eq('id', clientId);
-
-              if (updateError) throw updateError;
-
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               fetchData();
             } catch (error: any) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-              Alert.alert('Error', error.message);
+              Alert.alert('Błąd', error.message);
             }
           },
         },

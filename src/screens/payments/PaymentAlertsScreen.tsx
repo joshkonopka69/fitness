@@ -296,62 +296,89 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         } else if (selectedCategoryForPayment) {
           setPaymentBreadcrumb(selectedCategoryForPayment.label);
 
-          const { data: subcategoryStats, error } = 
-            await paymentTrackingService.getPaymentStatsBySubcategory(user.id, selectedCategoryForPayment.id);
-
-          if (error) throw error;
-
-          // Calculate total money owed per subcategory
-          const subcategoryChart: PaymentChartData[] = [];
-          
-          for (const sub of (subcategoryStats || []).filter(s => s.unpaid_clients > 0)) {
-            // Get clients in this subcategory to sum their balances
-            const { data: clientsInSub } = await paymentTrackingService.getUnpaidClientsInCategory(
-              user.id, 
-              sub.subcategory_id
-            );
-            
-            const totalOwed = (clientsInSub || []).reduce((sum, c) => {
-              return sum + (clientBalanceMap.get(c.client_id) || 0);
-            }, 0);
-
-            if (totalOwed > 0) {
-              subcategoryChart.push({
-                id: sub.subcategory_id,
-                label: sub.subcategory_name,
-                value: totalOwed,
-                color: sub.color,
-                icon: sub.icon,
-                type: 'subcategory',
-                parentId: selectedCategoryForPayment.id,
-              });
-            }
-          }
-
-          if (subcategoryChart.length > 0) {
-            setPaymentChartLevel('subcategories');
-            setPaymentChartData(subcategoryChart);
-          } else {
+          // Special handling for "Bez kategorii" (uncategorized clients)
+          if (selectedCategoryForPayment.id === 'uncategorized') {
             setPaymentChartLevel('clients');
-
-            const { data: unpaidInCategory, error: unpaidError } = 
-              await paymentTrackingService.getUnpaidClientsInCategory(
-                user.id, 
-                selectedCategoryForPayment.id
-              );
-
-            if (unpaidError) throw unpaidError;
-
-            const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
-              id: client.client_id,
-              label: client.client_name,
-              value: clientBalanceMap.get(client.client_id) || 0,
-              color: colors.primary,
-              type: 'client' as const,
-              parentId: selectedCategoryForPayment.id,
-            })).filter(c => c.value > 0);
+            
+            // Get clients without categories who owe money
+            const { data: clientsWithCategories } = await supabase
+              .from('client_categories')
+              .select('client_id');
+            
+            const clientIdsWithCategories = new Set((clientsWithCategories || []).map(cc => cc.client_id));
+            
+            const chartData: PaymentChartData[] = (allClientsData || [])
+              .filter(c => !clientIdsWithCategories.has(c.id) && (c.balance_owed || 0) > 0)
+              .map(client => ({
+                id: client.id,
+                label: client.name,
+                value: client.balance_owed || 0,
+                color: colors.primary,
+                type: 'client' as const,
+                parentId: 'uncategorized',
+              }))
+              .sort((a, b) => b.value - a.value);
 
             setPaymentChartData(chartData);
+          } else {
+            // Normal category handling
+            const { data: subcategoryStats, error } = 
+              await paymentTrackingService.getPaymentStatsBySubcategory(user.id, selectedCategoryForPayment.id);
+
+            if (error) throw error;
+
+            // Calculate total money owed per subcategory
+            const subcategoryChart: PaymentChartData[] = [];
+            
+            for (const sub of (subcategoryStats || []).filter(s => s.unpaid_clients > 0)) {
+              // Get clients in this subcategory to sum their balances
+              const { data: clientsInSub } = await paymentTrackingService.getUnpaidClientsInCategory(
+                user.id, 
+                sub.subcategory_id
+              );
+              
+              const totalOwed = (clientsInSub || []).reduce((sum, c) => {
+                return sum + (clientBalanceMap.get(c.client_id) || 0);
+              }, 0);
+
+              if (totalOwed > 0) {
+                subcategoryChart.push({
+                  id: sub.subcategory_id,
+                  label: sub.subcategory_name,
+                  value: totalOwed,
+                  color: sub.color,
+                  icon: sub.icon,
+                  type: 'subcategory',
+                  parentId: selectedCategoryForPayment.id,
+                });
+              }
+            }
+
+            if (subcategoryChart.length > 0) {
+              setPaymentChartLevel('subcategories');
+              setPaymentChartData(subcategoryChart);
+            } else {
+              setPaymentChartLevel('clients');
+
+              const { data: unpaidInCategory, error: unpaidError } = 
+                await paymentTrackingService.getUnpaidClientsInCategory(
+                  user.id, 
+                  selectedCategoryForPayment.id
+                );
+
+              if (unpaidError) throw unpaidError;
+
+              const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
+                id: client.client_id,
+                label: client.client_name,
+                value: clientBalanceMap.get(client.client_id) || 0,
+                color: colors.primary,
+                type: 'client' as const,
+                parentId: selectedCategoryForPayment.id,
+              })).filter(c => c.value > 0);
+
+              setPaymentChartData(chartData);
+            }
           }
         } else {
           setPaymentBreadcrumb(null);
@@ -386,25 +413,48 @@ export default function PaymentAlertsScreen({ navigation }: any) {
             });
 
           const chartData = (await Promise.all(chartDataPromises)).filter(c => c.value > 0);
+          
+          // Add uncategorized clients ("Bez kategorii") - clients with no categories who owe money
+          const { data: clientsWithCategories } = await supabase
+            .from('client_categories')
+            .select('client_id');
+          
+          const clientIdsWithCategories = new Set((clientsWithCategories || []).map(cc => cc.client_id));
+          
+          const uncategorizedOwed = (allClientsData || [])
+            .filter(c => !clientIdsWithCategories.has(c.id) && (c.balance_owed || 0) > 0)
+            .reduce((sum, c) => sum + (c.balance_owed || 0), 0);
+          
+          if (uncategorizedOwed > 0) {
+            chartData.push({
+              id: 'uncategorized',
+              label: 'Bez kategorii',
+              value: uncategorizedOwed,
+              color: colors.textSecondary,
+              icon: 'help-circle-outline',
+              type: 'category' as const,
+            });
+          }
+
           setPaymentChartData(chartData);
         }
       } else {
-        // "Individuals" view - show all unpaid clients with their balances
+        // "Individuals" view - show ALL clients with balance_owed > 0
+        // This includes clients without categories ("Wszystkie")
         setPaymentBreadcrumb(null);
         setPaymentChartLevel('clients');
 
-        const { data: unpaidClients, error } = 
-          await paymentTrackingService.getUnpaidClientsCurrentMonth(user.id);
-
-        if (error) throw error;
-
-        const chartData: PaymentChartData[] = (unpaidClients || []).map(client => ({
-          id: client.client_id,
-          label: client.client_name,
-          value: clientBalanceMap.get(client.client_id) || 0,
-          color: colors.primary,
-          type: 'client' as const,
-        })).filter(c => c.value > 0);
+        // Use allClientsData to show everyone who owes money
+        const chartData: PaymentChartData[] = (allClientsData || [])
+          .filter(c => (c.balance_owed || 0) > 0)
+          .map(client => ({
+            id: client.id,
+            label: client.name,
+            value: client.balance_owed || 0,
+            color: colors.primary,
+            type: 'client' as const,
+          }))
+          .sort((a, b) => b.value - a.value); // Sort by highest debt first
 
         setPaymentChartData(chartData);
       }
