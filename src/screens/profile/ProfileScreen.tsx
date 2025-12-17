@@ -16,16 +16,18 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { CoachProfile, profileService, ProfileStats, SubscriptionStatus } from '../../services/profileService';
+import { usePurchases } from '../../contexts/PurchasesContext';
+import { CoachProfile, profileService, ProfileStats } from '../../services/profileService';
 import { colors as defaultColors } from '../../theme/colors';
+import { getSubscriptionBadge } from '../../utils/subscription';
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, signOut } = useAuth();
   const { t } = useLanguage();
+  const { isPro, isTrialActive, customerInfo } = usePurchases();
   const colors = defaultColors; // Always use dark theme
   const [profile, setProfile] = useState<CoachProfile | null>(null);
   const [stats, setStats] = useState<ProfileStats | null>(null);
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
@@ -40,15 +42,13 @@ export default function ProfileScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      const [profileData, statsData, subscriptionData] = await Promise.all([
+      const [profileData, statsData] = await Promise.all([
         profileService.getCoachProfile(user.id),
         profileService.getProfileStats(user.id),
-        profileService.getSubscriptionStatus(user.id),
       ]);
 
       setProfile(profileData);
       setStats(statsData);
-      setSubscription(subscriptionData);
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -112,37 +112,35 @@ export default function ProfileScreen({ navigation }: any) {
         .slice(0, 2)
     : 'NA';
 
-  // Get premium button config
+  // Get premium button config using RevenueCat state
+  const subscriptionBadge = getSubscriptionBadge({ isPro, isTrialActive, customerInfo });
+  
   const getPremiumButtonConfig = () => {
-    if (!subscription) {
-      return { text: 'Trial', color: colors.primary, bgColor: `${colors.primary}20` };
-    }
-
-    if (subscription.status === 'active') {
+    if (isPro && !isTrialActive) {
       return { 
-        text: `Premium ✓`, 
+        text: 'PRO ✓', 
         color: colors.primary, 
         bgColor: `${colors.primary}20` 
       };
     }
 
-    if (subscription.status === 'trial') {
+    if (isTrialActive) {
       return { 
-        text: `Trial (${subscription.daysLeft}d)`, 
-        color: colors.primary, 
-        bgColor: `${colors.primary}20` 
+        text: 'Trial Active', 
+        color: '#FFD700', 
+        bgColor: 'rgba(255, 215, 0, 0.15)' 
       };
     }
 
     return { 
-      text: 'Get Premium', 
-      color: colors.destructive, 
-      bgColor: `${colors.destructive}20` 
+      text: 'Get PRO', 
+      color: colors.primary, 
+      bgColor: `${colors.primary}20` 
     };
   };
 
   const premiumConfig = getPremiumButtonConfig();
-  const isPremium = subscription?.status === 'active';
+  const isPremium = isPro && !isTrialActive;
 
   return (
     <>

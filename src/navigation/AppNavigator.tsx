@@ -25,7 +25,7 @@ import PaymentAlertsScreen from '../screens/payments/PaymentAlertsScreen';
 
 // NEW Screens
 import ProfileScreen from '../screens/profile/ProfileScreen';
-import SubscriptionScreen from '../screens/subscription/SubscriptionScreen';
+import PaywallScreen from '../screens/subscription/PaywallScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -185,8 +185,11 @@ function MainStack() {
       />
       <Stack.Screen
         name="Subscription"
-        component={SubscriptionScreen}
-        options={{ headerShown: false }}
+        component={PaywallScreen}
+        options={{ 
+          headerShown: false,
+          presentation: 'modal', // Present as modal for better UX
+        }}
       />
     </Stack.Navigator>
   );

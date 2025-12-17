@@ -32,9 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     });
     if (error) throw error;
-
+    
     console.log('User signed up successfully:', data.user?.id);
   };
 

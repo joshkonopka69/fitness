@@ -4,6 +4,9 @@ import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
 import {
   Alert,
+  Modal,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -46,6 +49,8 @@ export default function CreateSessionScreen({ navigation, route }: any) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [iosTimePickerMode, setIosTimePickerMode] = useState<'start' | 'end' | null>(null);
+  const [iosPendingTime, setIosPendingTime] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -117,6 +122,26 @@ export default function CreateSessionScreen({ navigation, route }: any) {
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const openIosTimePicker = (mode: 'start' | 'end') => {
+    setIosTimePickerMode(mode);
+    setIosPendingTime(mode === 'start' ? startTime : endTime);
+  };
+
+  const closeIosTimePicker = () => {
+    setIosTimePickerMode(null);
+  };
+
+  const confirmIosTimePicker = () => {
+    if (iosTimePickerMode === 'start') {
+      setStartTime(iosPendingTime);
+    } else if (iosTimePickerMode === 'end') {
+      setEndTime(iosPendingTime);
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    closeIosTimePicker();
   };
 
   const selectedColorObj = SESSION_COLORS.find(c => c.id === selectedColor) || SESSION_COLORS[0];
@@ -222,7 +247,13 @@ export default function CreateSessionScreen({ navigation, route }: any) {
             {/* Start Time */}
             <TouchableOpacity
               style={styles.timePickerCard}
-              onPress={() => setShowStartTimePicker(true)}
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  openIosTimePicker('start');
+                } else {
+                  setShowStartTimePicker(true);
+                }
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.timePickerIconContainer}>
@@ -242,7 +273,13 @@ export default function CreateSessionScreen({ navigation, route }: any) {
             {/* End Time */}
             <TouchableOpacity
               style={styles.timePickerCard}
-              onPress={() => setShowEndTimePicker(true)}
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  openIosTimePicker('end');
+                } else {
+                  setShowEndTimePicker(true);
+                }
+              }}
               activeOpacity={0.7}
             >
               <View style={styles.timePickerIconContainer}>
@@ -346,6 +383,41 @@ export default function CreateSessionScreen({ navigation, route }: any) {
         />
       )}
 
+      {/* iOS Time Picker with explicit OK/Cancel */}
+      {Platform.OS === 'ios' && iosTimePickerMode && (
+        <Modal
+          transparent
+          animationType="fade"
+          onRequestClose={closeIosTimePicker}
+        >
+          <Pressable style={styles.pickerOverlay} onPress={closeIosTimePicker}>
+            <Pressable style={styles.pickerSheet} onPress={() => {}}>
+              <Text style={styles.pickerTitle}>
+                {iosTimePickerMode === 'start' ? 'Select start time' : 'Select end time'}
+              </Text>
+
+              <DateTimePicker
+                value={iosPendingTime}
+                mode="time"
+                display="spinner"
+                onChange={(event, selectedTime) => {
+                  if (selectedTime) setIosPendingTime(selectedTime);
+                }}
+              />
+
+              <View style={styles.pickerButtonsRow}>
+                <TouchableOpacity style={styles.pickerButton} onPress={closeIosTimePicker}>
+                  <Text style={styles.pickerButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.pickerButtonPrimary} onPress={confirmIosTimePicker}>
+                  <Text style={styles.pickerButtonPrimaryText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
       {/* Success Modal */}
       <SuccessModal
         visible={showSuccessModal}
@@ -363,6 +435,60 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0A0A',
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: 16,
+  },
+  pickerSheet: {
+    width: '100%',
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  pickerButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  pickerButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#374151',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerButtonText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  pickerButtonPrimary: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#00FF88',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerButtonPrimaryText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    color: '#000000',
   },
   header: {
     flexDirection: 'row',

@@ -5,19 +5,16 @@ import {
   Poppins_700Bold,
   useFonts,
 } from '@expo-google-fonts/poppins';
-import { StripeProvider } from '@stripe/stripe-react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import 'react-native-gesture-handler';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
+import { PurchasesProvider } from './src/contexts/PurchasesContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { testConnection } from './src/lib/supabase';
 import AppNavigator from './src/navigation/AppNavigator';
-
-// Stripe publishable key (will be set from environment)
-const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
 
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync();
@@ -57,14 +54,14 @@ export default function App() {
   }
 
   return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-      <LanguageProvider>
-        <ThemeProvider>
-          <AuthProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <PurchasesProvider>
             <AppContent />
-          </AuthProvider>
-        </ThemeProvider>
-      </LanguageProvider>
-    </StripeProvider>
+          </PurchasesProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

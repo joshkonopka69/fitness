@@ -7,6 +7,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -35,6 +36,17 @@ interface Client {
 }
 
 export default function ClientsScreen({ navigation }: any) {
+  const getReadableTextColor = (hexColor?: string) => {
+    if (!hexColor) return colors.textPrimary;
+    // Basic luminance check for #RRGGBB
+    const c = hexColor.replace('#', '');
+    if (c.length !== 6) return colors.textPrimary;
+    const r = parseInt(c.slice(0, 2), 16);
+    const g = parseInt(c.slice(2, 4), 16);
+    const b = parseInt(c.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.62 ? '#000000' : '#FFFFFF';
+  };
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -377,25 +389,40 @@ export default function ClientsScreen({ navigation }: any) {
           contentContainerStyle={styles.categoriesContent}
         >
           {/* Wszystkie */}
-          <TouchableOpacity
-            style={[
-              styles.categoryTile,
-              !selectedCategory && styles.categoryTileSelected,
+          <Pressable
+            style={({ pressed }) => [
+              styles.categoryChip,
+              !selectedCategory && styles.categoryChipSelectedAll,
+              pressed && styles.categoryChipPressed,
             ]}
             onPress={() => setSelectedCategory(null)}
           >
-            <Text style={styles.categoryName}>Wszystkie</Text>
-            <Text style={styles.categoryCount}>{clients.length}</Text>
-          </TouchableOpacity>
+            <Text
+              style={[
+                styles.categoryChipText,
+                !selectedCategory && styles.categoryChipTextSelectedAll,
+              ]}
+              numberOfLines={1}
+            >
+              Wszystkie
+            </Text>
+            <View style={styles.categoryChipCountBadge}>
+              <Text style={styles.categoryChipCountText}>{clients.length}</Text>
+            </View>
+          </Pressable>
 
           {/* TYLKO Kategorie Główne (bez podkategorii) */}
-          {categories.map((category: ClientCategory) => (
-            <TouchableOpacity
+          {categories.map((category: ClientCategory) => {
+            const isSelected = selectedCategory === category.id;
+            const selectedTextColor = getReadableTextColor(category.color);
+            return (
+            <Pressable
               key={category.id}
-              style={[
-                styles.categoryTile,
+              style={({ pressed }) => [
+                styles.categoryChip,
                 { borderColor: category.color },
-                selectedCategory === category.id && styles.categoryTileSelected,
+                isSelected && { backgroundColor: category.color },
+                pressed && styles.categoryChipPressed,
               ]}
               onPress={() => setSelectedCategory(category.id)}
               onLongPress={() => {
@@ -404,15 +431,35 @@ export default function ClientsScreen({ navigation }: any) {
                 setShowOptionsModal(true);
               }}
             >
-              <Text style={styles.categoryName} numberOfLines={1}>
-                {category.name}
-              </Text>
-              {category.location && (
-                <Text style={styles.categoryLocation} numberOfLines={1}>
-                  {category.location}
+              <View style={styles.categoryChipTextCol}>
+                <Text
+                  style={[styles.categoryChipText, isSelected && { color: selectedTextColor }]}
+                  numberOfLines={1}
+                >
+                  {category.name}
                 </Text>
-              )}
-              <Text style={styles.categoryCount}>{category.client_count || 0}</Text>
+                {category.location && (
+                  <Text
+                    style={[
+                      styles.categoryChipSubtext,
+                      isSelected && { color: selectedTextColor },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {category.location}
+                  </Text>
+                )}
+              </View>
+              <View
+                style={[
+                  styles.categoryChipCountBadge,
+                  isSelected && { backgroundColor: selectedTextColor === '#000000' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.18)' },
+                ]}
+              >
+                <Text style={[styles.categoryChipCountText, isSelected && { color: selectedTextColor }]}>
+                  {category.client_count || 0}
+                </Text>
+              </View>
               
               {/* Badge z liczbą podkategorii */}
               {(category.subcategories?.length || 0) > 0 && (
@@ -432,8 +479,8 @@ export default function ClientsScreen({ navigation }: any) {
               >
                 <Ionicons name="ellipsis-vertical" size={16} color="#666" />
               </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
+            </Pressable>
+          )})}
         </ScrollView>
       )}
 
@@ -801,36 +848,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
   },
-  categoryTile: {
-    width: 120,
-    padding: 12,
+  // New: pill-style category chips (better selected state + readability)
+  categoryChip: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: colors.card,
-    borderRadius: 12,
-    borderWidth: 2,
+    borderRadius: 999,
+    borderWidth: 1,
     borderColor: 'transparent',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  categoryTileSelected: {
-    backgroundColor: '#F0F8FF',
+  categoryChipPressed: {
+    opacity: 0.88,
   },
-  categoryName: {
+  categoryChipSelectedAll: {
+    borderColor: colors.primary,
+    backgroundColor: colors.muted,
+  },
+  categoryChipTextCol: {
+    maxWidth: 150,
+    gap: 2,
+  },
+  categoryChipText: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 13,
     color: colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: 2,
   },
-  categoryLocation: {
+  categoryChipTextSelectedAll: {
+    color: colors.textPrimary,
+  },
+  categoryChipSubtext: {
     fontFamily: 'Poppins-Regular',
     fontSize: 10,
     color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 4,
   },
-  categoryCount: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
-    color: colors.primary,
+  categoryChipCountBadge: {
+    minWidth: 26,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 8,
+    backgroundColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryChipCountText: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 11,
+    color: colors.textPrimary,
   },
   categoryOptionsButton: {
     position: 'absolute',

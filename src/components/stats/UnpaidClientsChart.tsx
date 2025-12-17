@@ -1,7 +1,7 @@
 // ===============================================
 // UNPAID CLIENTS CHART COMPONENT
 // ===============================================
-// Wykres klientĂ„â€šÄąâ€šw ktĂ„â€šÄąâ€šrzy nie zapĂ„Ä…Ă˘â‚¬Ĺˇacili w tym miesiÄ‚â€žĂ˘â‚¬Â¦cu
+// Wykres klientów którzy nie zapłacili w tym miesiącu
 
 import React, { useState } from 'react';
 import {
@@ -57,7 +57,7 @@ export function UnpaidClientsChart({
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Ă„Ä…Ă‚Âadowanie danych...</Text>
+        <Text style={styles.loadingText}>Ładowanie danych...</Text>
       </View>
     );
   }
@@ -66,9 +66,9 @@ export function UnpaidClientsChart({
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-        <Text style={styles.emptyTitle}>Wszyscy zapĂ„Ä…Ă˘â‚¬Ĺˇacili! Ă„â€ÄąĹźÄąËťĂ˘â‚¬Â°</Text>
+        <Text style={styles.emptyTitle}>Wszyscy zapłacili!</Text>
         <Text style={styles.emptySubtitle}>
-          Brak nieopĂ„Ä…Ă˘â‚¬Ĺˇaconych klientĂ„â€šÄąâ€šw w {formatMonthYear(year, month)}
+          Brak nieopłaconych klientów w {formatMonthYear(year, month)}
         </Text>
       </View>
     );
@@ -184,7 +184,7 @@ export function UnpaidClientsChart({
               </View>
 
               {/* Value */}
-              <Text style={styles.valueText}>{item.value.toLocaleString()} zÄąâ€š</Text>
+              <Text style={styles.valueText}>{item.value.toLocaleString()} zł</Text>
 
               {/* Arrow for categories */}
               {viewMode === 'categories' && level !== 'clients' && item.type !== 'client' && (
@@ -204,7 +204,7 @@ export function UnpaidClientsChart({
         <View style={styles.hintContainer}>
           <Ionicons name="information-circle" size={16} color={colors.textSecondary} />
           <Text style={styles.hintText}>
-            Kliknij na grupÄ‚â€žĂ˘â€žË aby zobaczyÄ‚â€žĂ˘â‚¬Ë‡ szczegĂ„â€šÄąâ€šĂ„Ä…Ă˘â‚¬Ĺˇy
+            Kliknij na grupę, aby zobaczyć szczegóły
           </Text>
         </View>
       )}

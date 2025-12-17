@@ -38,12 +38,22 @@ interface Payment {
   payment_type: string;
   payment_date: string;
   client_id: string;
+  status: string;
+  client_name?: string;
 }
 
 interface Client {
   id: string;
   name: string;
   balance_owed: number;
+}
+
+interface PendingPayment {
+  id: string;
+  amount: number;
+  client_id: string;
+  client_name: string;
+  payment_date: string;
 }
 
 interface DailyRevenue {
@@ -70,8 +80,10 @@ export default function PaymentAlertsScreen({ navigation }: any) {
   const [totalCollected, setTotalCollected] = useState(0);
   const [totalOverdue, setTotalOverdue] = useState(0);
   const [overdueClients, setOverdueClients] = useState<Client[]>([]);
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
   const [revenueData, setRevenueData] = useState<DailyRevenue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentsTableMissing, setPaymentsTableMissing] = useState(false);
 
   // Add payment modals
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
@@ -138,44 +150,82 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      // Fetch all paid payments
+      // Fetch all completed payments (for Total Collected)
       const { data: paidPayments, error: paidError } = await supabase
         .from('payments')
         .select('amount, payment_date')
         .eq('coach_id', user.id)
         .eq('status', 'completed');
 
-      if (paidError) throw paidError;
+      if (paidError) {
+        const msg = String((paidError as any)?.message || '');
+        if (msg.includes("Could not find the table 'public.payments'") || 
+            msg.includes("in the schema cache")) {
+          setPaymentsTableMissing(true);
+          setTotalCollected(0);
+          setRevenueData([]);
+          setPendingPayments([]);
+        } else {
+          throw paidError;
+        }
+      } else {
+        setPaymentsTableMissing(false);
 
-      const collected = (paidPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      setTotalCollected(collected);
+        const collected = (paidPayments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        setTotalCollected(collected);
 
-      // Calculate revenue for last 14 days
-      const last14Days: DailyRevenue[] = [];
-      const today = new Date();
+        // Calculate revenue for last 14 days
+        const last14Days: DailyRevenue[] = [];
+        const today = new Date();
 
-      for (let i = 13; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
+        for (let i = 13; i >= 0; i--) {
+          const date = new Date(today);
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
 
-        const dayRevenue = (paidPayments || [])
-          .filter((p) => {
-            const paymentDate = new Date(p.payment_date).toISOString().split('T')[0];
-            return paymentDate === dateStr;
-          })
-          .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+          const dayRevenue = (paidPayments || [])
+            .filter((p) => {
+              const paymentDate = new Date(p.payment_date).toISOString().split('T')[0];
+              return paymentDate === dateStr;
+            })
+            .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
-        last14Days.push({
-          date: dateStr,
-          amount: dayRevenue,
-        });
+          last14Days.push({
+            date: dateStr,
+            amount: dayRevenue,
+          });
+        }
+
+        setRevenueData(last14Days);
       }
 
-      setRevenueData(last14Days);
+      // Fetch pending payments (for Overdue section)
+      const { data: pendingData, error: pendingError } = await supabase
+        .from('payments')
+        .select(`
+          id,
+          amount,
+          client_id,
+          payment_date,
+          clients!inner(name)
+        `)
+        .eq('coach_id', user.id)
+        .eq('status', 'pending')
+        .order('payment_date', { ascending: false });
+
+      if (!pendingError && pendingData) {
+        const formattedPending: PendingPayment[] = pendingData.map((p: any) => ({
+          id: p.id,
+          amount: p.amount,
+          client_id: p.client_id,
+          client_name: p.clients?.name || 'Unknown',
+          payment_date: p.payment_date,
+        }));
+        setPendingPayments(formattedPending);
+      }
 
       // Fetch clients with balance owed
-      const { data: clients, error: clientsError } = await supabase
+      const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
         .select('id, name, balance_owed')
         .eq('coach_id', user.id)
@@ -184,9 +234,12 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
       if (clientsError) throw clientsError;
 
-      setOverdueClients(clients || []);
-      const overdue = (clients || []).reduce((sum, c) => sum + Number(c.balance_owed || 0), 0);
-      setTotalOverdue(overdue);
+      setOverdueClients(clientsData || []);
+
+      // Calculate total overdue: balance_owed from clients + pending payments
+      const clientsOverdue = (clientsData || []).reduce((sum, c) => sum + Number(c.balance_owed || 0), 0);
+      const pendingOverdue = (pendingData || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      setTotalOverdue(clientsOverdue + pendingOverdue);
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -350,6 +403,11 @@ export default function PaymentAlertsScreen({ navigation }: any) {
   };
 
   const handleAddPayment = async () => {
+    if (!user) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     if (!selectedClient || !amount) {
       Alert.alert('Error', 'Please select a client and enter an amount');
       return;
@@ -367,9 +425,9 @@ export default function PaymentAlertsScreen({ navigation }: any) {
       const paymentDate = new Date().toISOString().split('T')[0];
       const clientRecord = clients.find((c) => c.id === selectedClient);
       const updatedBalance = Math.max((clientRecord?.balance_owed || 0) - parsedAmount, 0);
-
+      
       const { error } = await supabase.from('payments').insert({
-        coach_id: user?.id,
+        coach_id: user.id,
         client_id: selectedClient,
         amount: parsedAmount,
         payment_type: 'manual',
@@ -380,10 +438,23 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
       if (error) throw error;
 
-      await supabase
+      const { error: updateClientError } = await supabase
         .from('clients')
         .update({ balance_owed: updatedBalance })
-        .eq('id', selectedClient);
+        .eq('id', selectedClient)
+        .eq('coach_id', user.id);
+
+      if (updateClientError) throw updateClientError;
+
+      // Keep monthly tracking in sync (used by Clients screen)
+      const { error: trackingError } = await paymentTrackingService.markClientAsPaid(
+        user.id,
+        selectedClient,
+        'Manual payment'
+      );
+      if (trackingError) {
+        console.warn('Failed to mark client as paid in monthly tracking:', trackingError);
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowAddPaymentModal(false);
@@ -394,12 +465,17 @@ export default function PaymentAlertsScreen({ navigation }: any) {
       fetchPaymentData();
       fetchAllClients();
     } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackStyle.Error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message);
     }
   };
 
   const handleAddOverdue = async () => {
+    if (!user) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     if (!selectedClient || !amount) {
       Alert.alert('Error', 'Please select a client and enter an amount');
       return;
@@ -420,11 +496,15 @@ export default function PaymentAlertsScreen({ navigation }: any) {
       const { error } = await supabase
         .from('clients')
         .update({ balance_owed: newBalance })
-        .eq('id', selectedClient);
+        .eq('id', selectedClient)
+        .eq('coach_id', user.id);
 
       if (error) throw error;
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackStyle.Success);
+      // Mark client as unpaid in monthly tracking (they owe money)
+      await paymentTrackingService.markClientAsUnpaid(user.id, selectedClient);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowAddOverdueModal(false);
       setSelectedClient('');
       setAmount('');
@@ -433,24 +513,31 @@ export default function PaymentAlertsScreen({ navigation }: any) {
       fetchAllClients();
       fetchPaymentData();
     } catch (error: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackStyle.Error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', error.message);
     }
   };
 
   const handleMarkPaid = async (clientId: string, clientName: string, amount: number) => {
+    if (!user) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     Alert.alert(
       'Mark as Paid',
-      `Mark ${clientName} as paid?`,
+      `Mark ${clientName} as paid (${formatCurrency(amount)})?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Mark Paid',
           onPress: async () => {
             try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              
               const paymentDate = new Date().toISOString().split('T')[0];
               const { error: paymentError } = await supabase.from('payments').insert({
-                coach_id: user?.id,
+                coach_id: user.id,
                 client_id: clientId,
                 amount,
                 payment_type: 'manual',
@@ -464,15 +551,90 @@ export default function PaymentAlertsScreen({ navigation }: any) {
               const { error: updateError } = await supabase
                 .from('clients')
                 .update({ balance_owed: 0 })
-                .eq('id', clientId);
+                .eq('id', clientId)
+                .eq('coach_id', user.id);
 
               if (updateError) throw updateError;
 
+              const { error: trackingError } = await paymentTrackingService.markClientAsPaid(
+                user.id,
+                clientId,
+                'Marked paid'
+              );
+              if (trackingError) {
+                console.warn('Failed to mark client as paid in monthly tracking:', trackingError);
+              }
+
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               setShowMarkPaidSuccessModal(true);
               fetchData();
               fetchPaymentData();
               fetchAllClients();
             } catch (error: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert('Error', error.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Mark a pending payment as completed
+  const handleMarkPendingAsPaid = async (payment: PendingPayment) => {
+    if (!user) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    Alert.alert(
+      'Mark as Paid',
+      `Mark ${payment.client_name}'s payment of ${formatCurrency(payment.amount)} as paid?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Paid',
+          onPress: async () => {
+            try {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+              // Update payment status from pending to completed
+              const { error: paymentError } = await supabase
+                .from('payments')
+                .update({ status: 'completed' })
+                .eq('id', payment.id);
+
+              if (paymentError) throw paymentError;
+
+              // Reduce client's balance_owed
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('balance_owed')
+                .eq('id', payment.client_id)
+                .single();
+
+              if (clientData) {
+                const newBalance = Math.max(0, (clientData.balance_owed || 0) - payment.amount);
+                await supabase
+                  .from('clients')
+                  .update({ balance_owed: newBalance })
+                  .eq('id', payment.client_id);
+              }
+
+              // Mark in monthly tracking
+              await paymentTrackingService.markClientAsPaid(
+                user.id,
+                payment.client_id,
+                'Pending payment completed'
+              );
+
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              setShowMarkPaidSuccessModal(true);
+              fetchData();
+              fetchPaymentData();
+              fetchAllClients();
+            } catch (error: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               Alert.alert('Error', error.message);
             }
           },
@@ -551,6 +713,15 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(200)} style={styles.graphCard}>
           <Text style={styles.graphTitle}>Revenue (Last 2 Weeks)</Text>
 
+          {paymentsTableMissing && (
+            <View style={styles.dbWarning}>
+              <Ionicons name="alert-circle-outline" size={18} color={colors.warning} />
+              <Text style={styles.dbWarningText}>
+                Payments table is missing in Supabase. Run the SQL setup scripts (see `database/`) and reload the app.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.graphContainer}>
             <Svg width={GRAPH_WIDTH + Y_AXIS_WIDTH} height={GRAPH_HEIGHT} style={styles.graph}>
               {/* Y-axis labels and grid lines */}
@@ -594,14 +765,14 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
                 return (
                   <G key={`bar-${index}`}>
-                    <Rect
-                      x={x}
-                      y={y}
-                      width={barWidth}
-                      height={barHeight || 2}
-                      fill={colors.primary}
-                      rx={4}
-                    />
+                  <Rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={barHeight || 2}
+                    fill={colors.primary}
+                    rx={4}
+                  />
                   </G>
                 );
               })}
@@ -644,11 +815,56 @@ export default function PaymentAlertsScreen({ navigation }: any) {
           />
         </Animated.View>
 
-        {/* Overdue Clients */}
+        {/* Pending Payments - Show first as these are awaiting confirmation */}
+        {pendingPayments.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(300)} style={styles.overdueSection}>
+            <View style={styles.overdueSectionHeader}>
+              <View style={styles.overdueTitleRow}>
+                <Ionicons name="time" size={20} color={colors.warning} />
+                <Text style={styles.overdueSectionTitle}>Pending Payments</Text>
+              </View>
+              <Text style={styles.overdueCount}>{pendingPayments.length} waiting</Text>
+            </View>
+
+            {pendingPayments.map((payment: PendingPayment, index: number) => (
+              <Animated.View
+                key={payment.id}
+                entering={FadeInDown.delay(350 + index * 50)}
+                style={[styles.overdueCard, styles.pendingCard]}
+              >
+                <View style={styles.overdueLeft}>
+                  <View style={[styles.overdueAvatar, styles.pendingAvatar]}>
+                    <Text style={styles.overdueAvatarText}>
+                      {payment.client_name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.overdueName}>{payment.client_name}</Text>
+                    <Text style={styles.overdueAmount}>{formatCurrency(payment.amount)}</Text>
+                    <Text style={styles.pendingDate}>
+                      {new Date(payment.payment_date).toLocaleDateString('pl-PL')}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.markPaidButton}
+                  onPress={() => handleMarkPendingAsPaid(payment)}
+                >
+                  <Text style={styles.markPaidButtonText}>Confirm Paid</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </Animated.View>
+        )}
+
+        {/* Overdue Clients - Balance owed */}
         {overdueClients.length > 0 && (
           <Animated.View entering={FadeInDown.delay(300)} style={styles.overdueSection}>
             <View style={styles.overdueSectionHeader}>
-              <Text style={styles.overdueSectionTitle}>Overdue Payments</Text>
+              <View style={styles.overdueTitleRow}>
+                <Ionicons name="alert-circle" size={20} color={colors.destructive} />
+                <Text style={styles.overdueSectionTitle}>Balance Owed</Text>
+              </View>
               <Text style={styles.overdueCount}>{overdueClients.length} clients</Text>
             </View>
 
@@ -666,7 +882,7 @@ export default function PaymentAlertsScreen({ navigation }: any) {
                   </View>
                   <View>
                     <Text style={styles.overdueName}>{client.name}</Text>
-                  <Text style={styles.overdueAmount}>{formatCurrency(client.balance_owed)}</Text>
+                    <Text style={styles.overdueAmount}>{formatCurrency(client.balance_owed)}</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -767,61 +983,61 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         >
           <Pressable style={styles.modalOverlay} onPress={dismissKeyboard}>
             <Pressable style={styles.formModal}>
-              <View style={styles.formHeader}>
-                <Text style={styles.formTitle}>Add Payment</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowAddPaymentModal(false);
-                    setSelectedClient('');
-                    setAmount('');
-                  }}
-                >
-                  <Ionicons name="close" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.formLabel}>Select Client</Text>
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>Add Payment</Text>
               <TouchableOpacity
-                style={styles.modernPicker}
                 onPress={() => {
-                  dismissKeyboard();
-                  setClientSelectorMode('payment');
-                  setSearchQuery('');
-                  setShowClientSelector(true);
+                  setShowAddPaymentModal(false);
+                  setSelectedClient('');
+                  setAmount('');
                 }}
-                activeOpacity={0.7}
               >
-                <View style={styles.pickerIconContainer}>
-                  <Ionicons name="person" size={22} color={selectedClient ? colors.primary : colors.textSecondary} />
-                </View>
-                <Text style={selectedClient ? styles.pickerTextSelected : styles.pickerPlaceholder}>
-                  {selectedClient ? clients.find((c: Client) => c.id === selectedClient)?.name : 'Choose client...'}
-                </Text>
-                <Ionicons name="chevron-down-circle" size={24} color={colors.primary} />
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
+            </View>
+
+            <Text style={styles.formLabel}>Select Client</Text>
+            <TouchableOpacity
+              style={styles.modernPicker}
+              onPress={() => {
+                  dismissKeyboard();
+                setClientSelectorMode('payment');
+                setSearchQuery('');
+                setShowClientSelector(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.pickerIconContainer}>
+                <Ionicons name="person" size={22} color={selectedClient ? colors.primary : colors.textSecondary} />
+              </View>
+              <Text style={selectedClient ? styles.pickerTextSelected : styles.pickerPlaceholder}>
+                  {selectedClient ? clients.find((c: Client) => c.id === selectedClient)?.name : 'Choose client...'}
+              </Text>
+              <Ionicons name="chevron-down-circle" size={24} color={colors.primary} />
+            </TouchableOpacity>
 
               <Text style={styles.formLabel}>Amount (PLN)</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="cash" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="0"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                  value={amount}
-                  onChangeText={setAmount}
+            <View style={styles.inputContainer}>
+              <Ionicons name="cash" size={20} color={colors.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={setAmount}
                   returnKeyType="done"
                   onSubmitEditing={dismissKeyboard}
-                />
-              </View>
+              />
+            </View>
 
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleAddPayment}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.submitButtonText}>Add Payment</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleAddPayment}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitButtonText}>Add Payment</Text>
+            </TouchableOpacity>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -840,61 +1056,61 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         >
           <Pressable style={styles.modalOverlay} onPress={dismissKeyboard}>
             <Pressable style={styles.formModal}>
-              <View style={styles.formHeader}>
-                <Text style={styles.formTitle}>Add Overdue</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowAddOverdueModal(false);
-                    setSelectedClient('');
-                    setAmount('');
-                  }}
-                >
-                  <Ionicons name="close" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.formLabel}>Select Client</Text>
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>Add Overdue</Text>
               <TouchableOpacity
-                style={styles.modernPicker}
                 onPress={() => {
-                  dismissKeyboard();
-                  setClientSelectorMode('overdue');
-                  setSearchQuery('');
-                  setShowClientSelector(true);
+                  setShowAddOverdueModal(false);
+                  setSelectedClient('');
+                  setAmount('');
                 }}
-                activeOpacity={0.7}
               >
-                <View style={styles.pickerIconContainer}>
-                  <Ionicons name="person" size={22} color={selectedClient ? colors.primary : colors.textSecondary} />
-                </View>
-                <Text style={selectedClient ? styles.pickerTextSelected : styles.pickerPlaceholder}>
-                  {selectedClient ? clients.find((c: Client) => c.id === selectedClient)?.name : 'Choose client...'}
-                </Text>
-                <Ionicons name="chevron-down-circle" size={24} color={colors.primary} />
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
+            </View>
+
+            <Text style={styles.formLabel}>Select Client</Text>
+            <TouchableOpacity
+              style={styles.modernPicker}
+              onPress={() => {
+                  dismissKeyboard();
+                setClientSelectorMode('overdue');
+                setSearchQuery('');
+                setShowClientSelector(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.pickerIconContainer}>
+                <Ionicons name="person" size={22} color={selectedClient ? colors.primary : colors.textSecondary} />
+              </View>
+              <Text style={selectedClient ? styles.pickerTextSelected : styles.pickerPlaceholder}>
+                  {selectedClient ? clients.find((c: Client) => c.id === selectedClient)?.name : 'Choose client...'}
+              </Text>
+              <Ionicons name="chevron-down-circle" size={24} color={colors.primary} />
+            </TouchableOpacity>
 
               <Text style={styles.formLabel}>Amount (PLN)</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="time" size={20} color={colors.warning} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="0"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                  value={amount}
-                  onChangeText={setAmount}
+            <View style={styles.inputContainer}>
+              <Ionicons name="time" size={20} color={colors.warning} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+                value={amount}
+                onChangeText={setAmount}
                   returnKeyType="done"
                   onSubmitEditing={dismissKeyboard}
-                />
-              </View>
+              />
+            </View>
 
-              <TouchableOpacity
-                style={[styles.submitButton, { backgroundColor: colors.warning }]}
-                onPress={handleAddOverdue}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.submitButtonText}>Add Overdue</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: colors.warning }]}
+              onPress={handleAddOverdue}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitButtonText}>Add Overdue</Text>
+            </TouchableOpacity>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -913,98 +1129,98 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         >
           <Pressable style={styles.modalOverlay} onPress={() => setShowClientSelector(false)}>
             <Pressable style={styles.clientSelectorModal}>
-              <View style={styles.formHeader}>
-                <Text style={styles.formTitle}>Select Client</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowClientSelector(false);
-                    setSearchQuery('');
-                  }}
-                >
-                  <Ionicons name="close" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-              </View>
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>Select Client</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowClientSelector(false);
+                  setSearchQuery('');
+                }}
+              >
+                <Ionicons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
 
-              <Text style={styles.clientSelectorSubtitle}>
-                {clientSelectorMode === 'payment' 
-                  ? 'Choose a client to add payment'
-                  : 'Choose a client to add overdue amount'}
-              </Text>
+            <Text style={styles.clientSelectorSubtitle}>
+              {clientSelectorMode === 'payment' 
+                ? 'Choose a client to add payment'
+                : 'Choose a client to add overdue amount'}
+            </Text>
 
-              {/* Search Input */}
-              <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color={colors.textSecondary} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search clients..."
-                  placeholderTextColor={colors.textSecondary}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color={colors.textSecondary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search clients..."
+                placeholderTextColor={colors.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
                   autoFocus={false}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </View>
 
-              {/* Client List */}
-              <ScrollView 
-                style={styles.clientList} 
-                showsVerticalScrollIndicator={false}
+            {/* Client List */}
+            <ScrollView 
+              style={styles.clientList} 
+              showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="always"
                 keyboardDismissMode="on-drag"
-              >
-                {clients
+            >
+              {clients
                   .filter((client: Client) => 
-                    client.name.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((client: Client) => (
-                    <TouchableOpacity
-                      key={client.id}
-                      style={[
-                        styles.clientSelectorItem,
-                        selectedClient === client.id && styles.clientSelectorItemSelected
-                      ]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedClient(client.id);
-                        setShowClientSelector(false);
-                        setSearchQuery('');
-                        dismissKeyboard();
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.clientSelectorAvatar}>
-                        <Text style={styles.clientSelectorAvatarText}>
-                          {client.name.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={styles.clientSelectorInfo}>
-                        <Text style={styles.clientSelectorName}>{client.name}</Text>
-                        <Text style={styles.clientSelectorBalance}>
-                          Balance: {formatCurrency(client.balance_owed || 0)}
-                        </Text>
-                      </View>
-                      {selectedClient === client.id && (
-                        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                
-                {clients.filter((client: Client) => 
                   client.name.toLowerCase().includes(searchQuery.toLowerCase())
-                ).length === 0 && (
-                  <View style={styles.emptySearchState}>
-                    <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
-                    <Text style={styles.emptySearchText}>No clients found</Text>
-                    <Text style={styles.emptySearchSubtext}>
-                      {searchQuery ? 'Try a different search' : 'Add clients to get started'}
-                    </Text>
-                  </View>
-                )}
-              </ScrollView>
+                )
+                  .map((client: Client) => (
+                  <TouchableOpacity
+                    key={client.id}
+                    style={[
+                      styles.clientSelectorItem,
+                      selectedClient === client.id && styles.clientSelectorItemSelected
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedClient(client.id);
+                      setShowClientSelector(false);
+                      setSearchQuery('');
+                        dismissKeyboard();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.clientSelectorAvatar}>
+                      <Text style={styles.clientSelectorAvatarText}>
+                        {client.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.clientSelectorInfo}>
+                      <Text style={styles.clientSelectorName}>{client.name}</Text>
+                      <Text style={styles.clientSelectorBalance}>
+                          Balance: {formatCurrency(client.balance_owed || 0)}
+                      </Text>
+                    </View>
+                    {selectedClient === client.id && (
+                      <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              
+                {clients.filter((client: Client) => 
+                client.name.toLowerCase().includes(searchQuery.toLowerCase())
+              ).length === 0 && (
+                <View style={styles.emptySearchState}>
+                  <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
+                  <Text style={styles.emptySearchText}>No clients found</Text>
+                  <Text style={styles.emptySearchSubtext}>
+                    {searchQuery ? 'Try a different search' : 'Add clients to get started'}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -1135,6 +1351,24 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginBottom: 16,
   },
+  dbWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.warning + '15',
+    borderWidth: 1,
+    borderColor: colors.warning + '35',
+    marginBottom: 12,
+  },
+  dbWarningText: {
+    flex: 1,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
   graphContainer: {
     alignItems: 'center',
   },
@@ -1168,6 +1402,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  overdueTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   overdueSectionTitle: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 18,
@@ -1188,6 +1427,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  pendingCard: {
+    borderColor: colors.warning + '50',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+  },
+  pendingAvatar: {
+    backgroundColor: colors.warning + '30',
+  },
+  pendingDate: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   overdueLeft: {
     flexDirection: 'row',

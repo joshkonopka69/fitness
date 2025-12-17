@@ -21,7 +21,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hubertdomagalaa.fitnessguru",
-      "buildNumber": "1.0.0"
+      "buildNumber": "1.0.0",
+      "usesIcloudStorage": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
