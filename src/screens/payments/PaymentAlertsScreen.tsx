@@ -252,6 +252,19 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
     setLoadingPaymentData(true);
     try {
+      // Get all clients with their balance_owed for money display
+      const { data: allClientsData } = await supabase
+        .from('clients')
+        .select('id, name, balance_owed')
+        .eq('coach_id', user.id);
+      
+      const clientBalanceMap = new Map<string, number>();
+      const clientNameMap = new Map<string, string>();
+      (allClientsData || []).forEach(c => {
+        clientBalanceMap.set(c.id, c.balance_owed || 0);
+        clientNameMap.set(c.id, c.name);
+      });
+
       if (paymentViewMode === 'categories') {
         if (selectedSubcategoryForPayment) {
           setPaymentChartLevel('clients');
@@ -269,14 +282,15 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
           if (error) throw error;
 
+          // Show actual money owed, not just count
           const chartData: PaymentChartData[] = (unpaidInSubcategory || []).map(client => ({
             id: client.client_id,
             label: client.client_name,
-            value: 1,
+            value: clientBalanceMap.get(client.client_id) || 0,
             color: colors.primary,
-            type: 'client',
+            type: 'client' as const,
             parentId: selectedSubcategoryForPayment.id,
-          }));
+          })).filter(c => c.value > 0); // Only show clients who actually owe money
 
           setPaymentChartData(chartData);
         } else if (selectedCategoryForPayment) {
@@ -287,17 +301,32 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
           if (error) throw error;
 
-          const subcategoryChart: PaymentChartData[] = (subcategoryStats || [])
-            .filter(sub => sub.unpaid_clients > 0)
-            .map(sub => ({
-              id: sub.subcategory_id,
-              label: sub.subcategory_name,
-              value: sub.unpaid_clients,
-              color: sub.color,
-              icon: sub.icon,
-              type: 'subcategory',
-              parentId: selectedCategoryForPayment.id,
-            }));
+          // Calculate total money owed per subcategory
+          const subcategoryChart: PaymentChartData[] = [];
+          
+          for (const sub of (subcategoryStats || []).filter(s => s.unpaid_clients > 0)) {
+            // Get clients in this subcategory to sum their balances
+            const { data: clientsInSub } = await paymentTrackingService.getUnpaidClientsInCategory(
+              user.id, 
+              sub.subcategory_id
+            );
+            
+            const totalOwed = (clientsInSub || []).reduce((sum, c) => {
+              return sum + (clientBalanceMap.get(c.client_id) || 0);
+            }, 0);
+
+            if (totalOwed > 0) {
+              subcategoryChart.push({
+                id: sub.subcategory_id,
+                label: sub.subcategory_name,
+                value: totalOwed,
+                color: sub.color,
+                icon: sub.icon,
+                type: 'subcategory',
+                parentId: selectedCategoryForPayment.id,
+              });
+            }
+          }
 
           if (subcategoryChart.length > 0) {
             setPaymentChartLevel('subcategories');
@@ -316,11 +345,11 @@ export default function PaymentAlertsScreen({ navigation }: any) {
             const chartData: PaymentChartData[] = (unpaidInCategory || []).map(client => ({
               id: client.client_id,
               label: client.client_name,
-              value: 1,
+              value: clientBalanceMap.get(client.client_id) || 0,
               color: colors.primary,
-              type: 'client',
+              type: 'client' as const,
               parentId: selectedCategoryForPayment.id,
-            }));
+            })).filter(c => c.value > 0);
 
             setPaymentChartData(chartData);
           }
@@ -333,20 +362,34 @@ export default function PaymentAlertsScreen({ navigation }: any) {
 
           if (error) throw error;
 
-          const chartData: PaymentChartData[] = (categoryStats || [])
+          // Calculate total money owed per category
+          const chartDataPromises = (categoryStats || [])
             .filter(cat => cat.unpaid_clients > 0)
-            .map(cat => ({
-              id: cat.category_id,
-              label: cat.category_name,
-              value: cat.unpaid_clients,
-              color: cat.color,
-              icon: cat.icon,
-              type: 'category',
-            }));
+            .map(async cat => {
+              const { data: clientsInCat } = await paymentTrackingService.getUnpaidClientsInCategory(
+                user.id,
+                cat.category_id
+              );
+              
+              const totalOwed = (clientsInCat || []).reduce((sum, c) => {
+                return sum + (clientBalanceMap.get(c.client_id) || 0);
+              }, 0);
 
+              return {
+                id: cat.category_id,
+                label: cat.category_name,
+                value: totalOwed,
+                color: cat.color,
+                icon: cat.icon,
+                type: 'category' as const,
+              };
+            });
+
+          const chartData = (await Promise.all(chartDataPromises)).filter(c => c.value > 0);
           setPaymentChartData(chartData);
         }
       } else {
+        // "Individuals" view - show all unpaid clients with their balances
         setPaymentBreadcrumb(null);
         setPaymentChartLevel('clients');
 
@@ -358,10 +401,10 @@ export default function PaymentAlertsScreen({ navigation }: any) {
         const chartData: PaymentChartData[] = (unpaidClients || []).map(client => ({
           id: client.client_id,
           label: client.client_name,
-          value: 1,
+          value: clientBalanceMap.get(client.client_id) || 0,
           color: colors.primary,
-          type: 'client',
-        }));
+          type: 'client' as const,
+        })).filter(c => c.value > 0);
 
         setPaymentChartData(chartData);
       }

@@ -19,6 +19,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import CategoryOptionsModal from '../../components/ui/CategoryOptionsModal';
 import CreateCategoryModal from '../../components/ui/CreateCategoryModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { categoryService } from '../../services/categoryService';
 import { clientService } from '../../services/clientService';
 import { paymentTrackingService } from '../../services/paymentTrackingService';
@@ -248,17 +249,58 @@ export default function ClientsScreen({ navigation }: any) {
         {
           text: 'Potwierdź',
           onPress: async () => {
-            const { error } = await paymentTrackingService.toggleClientPaymentStatus(
-              user.id,
-              client.id,
-              currentStatus
-            );
-            
-            if (error) {
-              Alert.alert('Błąd', 'Nie udało się zaktualizować statusu płatności');
-            } else {
+            try {
+              // 1. Toggle monthly tracking status
+              const { error } = await paymentTrackingService.toggleClientPaymentStatus(
+                user.id,
+                client.id,
+                currentStatus
+              );
+              
+              if (error) throw error;
+
+              // 2. Get client's current balance from database
+              const { data: clientData } = await supabase
+                .from('clients')
+                .select('balance_owed')
+                .eq('id', client.id)
+                .single();
+
+              const currentBalance = clientData?.balance_owed || 0;
+
+              if (newStatus) {
+                // Marking as PAID:
+                // - Clear the balance_owed (set to 0)
+                // - Create a completed payment record for the amount
+                if (currentBalance > 0) {
+                  // Insert a completed payment
+                  await supabase.from('payments').insert({
+                    coach_id: user.id,
+                    client_id: client.id,
+                    amount: currentBalance,
+                    payment_type: 'manual',
+                    payment_method: 'cash',
+                    status: 'completed',
+                    payment_date: new Date().toISOString().split('T')[0],
+                    notes: 'Marked as paid (long-press)',
+                  });
+
+                  // Clear the balance
+                  await supabase
+                    .from('clients')
+                    .update({ balance_owed: 0 })
+                    .eq('id', client.id);
+                }
+              }
+              // Note: Marking as unpaid doesn't automatically add balance - 
+              // user should add overdue amount manually if needed
+              
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert('Sukces', `${client.name} został oznaczony jako ${newStatus ? 'zapłacony' : 'nieopłacony'}`);
-              fetchClients(); // Odśwież listę
+              fetchClients(); // Refresh list
+            } catch (err: any) {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+              Alert.alert('Błąd', err.message || 'Nie udało się zaktualizować statusu płatności');
             }
           },
         },
