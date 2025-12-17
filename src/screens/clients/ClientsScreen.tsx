@@ -473,44 +473,22 @@ export default function ClientsScreen({ navigation }: any) {
                 setShowOptionsModal(true);
               }}
             >
-              <View style={styles.categoryChipTextCol}>
-                <Text
-                  style={[styles.categoryChipText, isSelected && { color: selectedTextColor }]}
-                  numberOfLines={1}
-                >
-                  {category.name}
-                </Text>
-                {category.location && (
-                  <Text
-                    style={[
-                      styles.categoryChipSubtext,
-                      isSelected && { color: selectedTextColor },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {category.location}
-                  </Text>
-                )}
-              </View>
+              <Text
+                style={[styles.categoryChipText, isSelected && { color: selectedTextColor }]}
+                numberOfLines={1}
+              >
+                {category.name}
+              </Text>
               <View
                 style={[
                   styles.categoryChipCountBadge,
-                  isSelected && { backgroundColor: selectedTextColor === '#000000' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.18)' },
+                  isSelected && { backgroundColor: selectedTextColor === '#000000' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.2)' },
                 ]}
               >
                 <Text style={[styles.categoryChipCountText, isSelected && { color: selectedTextColor }]}>
                   {category.client_count || 0}
                 </Text>
               </View>
-              
-              {/* Badge z liczbą podkategorii */}
-              {(category.subcategories?.length || 0) > 0 && (
-                <View style={styles.subcategoryBadge}>
-                  <Text style={styles.subcategoryBadgeText}>
-                    +{category.subcategories?.length}
-                  </Text>
-                </View>
-              )}
 
               <TouchableOpacity
                 style={styles.categoryOptionsButton}
@@ -883,63 +861,53 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   categoriesScroll: {
-    maxHeight: 140,
+    maxHeight: 80,
     marginBottom: 8,
   },
   categoriesContent: {
     paddingHorizontal: 16,
-    gap: 12,
+    gap: 8,
   },
-  // New: pill-style category chips (better selected state + readability)
+  // Compact pill-style category chips
   categoryChip: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    height: 32,
+    paddingHorizontal: 12,
     backgroundColor: colors.card,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
   },
   categoryChipPressed: {
-    opacity: 0.88,
+    opacity: 0.85,
   },
   categoryChipSelectedAll: {
     borderColor: colors.primary,
-    backgroundColor: colors.muted,
-  },
-  categoryChipTextCol: {
-    maxWidth: 150,
-    gap: 2,
+    backgroundColor: colors.primary + '15',
   },
   categoryChipText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+    fontSize: 12,
     color: colors.textPrimary,
   },
   categoryChipTextSelectedAll: {
-    color: colors.textPrimary,
-  },
-  categoryChipSubtext: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 10,
-    color: colors.textSecondary,
+    color: colors.primary,
   },
   categoryChipCountBadge: {
-    minWidth: 26,
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
     backgroundColor: colors.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryChipCountText: {
     fontFamily: 'Poppins-Bold',
-    fontSize: 11,
-    color: colors.textPrimary,
+    fontSize: 10,
+    color: colors.textSecondary,
   },
   categoryOptionsButton: {
     position: 'absolute',
